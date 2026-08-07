@@ -228,6 +228,16 @@ export class SaveSystem {
     this.notify();
   }
 
+  public setCompanion(creatureId: string) {
+    if (this.creatures.has(creatureId)) {
+      this.state.companionId = creatureId;
+      this.creatures.forEach((c) => {
+        c.isCompanion = (c.id === creatureId);
+      });
+      this.notify();
+    }
+  }
+
   public hatchEgg(eggId: string, creatureName: string): SolanderCreatureData {
     if (!this.state.hatchedEggs.includes(eggId)) {
       this.state.hatchedEggs.push(eggId);

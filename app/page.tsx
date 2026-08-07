@@ -18,6 +18,29 @@ export default function SolanderGamePage() {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [showPassport, setShowPassport] = useState<boolean>(false);
   const [showNurtureModal, setShowNurtureModal] = useState<boolean>(false);
+  const [showRosterModal, setShowRosterModal] = useState<boolean>(false);
+  const [isCarryingState, setIsCarryingState] = useState<boolean>(false);
+
+  const handleTriggerAttack = () => {
+    if (sceneManagerRef.current) {
+      sceneManagerRef.current.handlePlayerAttack();
+    }
+  };
+
+  const handleTriggerCarry = () => {
+    if (sceneManagerRef.current) {
+      sceneManagerRef.current.toggleCarryCompanion();
+      setIsCarryingState(sceneManagerRef.current.player.isCarrying);
+    }
+  };
+
+  const handleSelectCompanion = (id: string) => {
+    if (sceneManagerRef.current) {
+      sceneManagerRef.current.selectCompanion(id);
+      setCompanion(saveSystem.getCompanion());
+    }
+    setShowRosterModal(false);
+  };
 
   // Companion & Save state
   const [companion, setCompanion] = useState<SolanderCreatureData | null>(null);
@@ -141,7 +164,29 @@ export default function SolanderGamePage() {
             </div>
             <div className="flex items-center gap-2 mt-1 text-xs text-slate-300 font-medium">
               <Compass className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Location: {currentWorld === 'GARDEN' ? 'Solander Garden' : 'Mystic Valley'}</span>
+              <span>Location: {currentWorld === 'GARDEN' ? '🏡 Solander Garden' : '⚔️ Mystic Valley'}</span>
+            </div>
+            <div className="flex items-center gap-1.5 mt-2">
+              <button
+                onClick={() => {
+                  if (sceneManagerRef.current && currentWorld !== 'GARDEN') {
+                    sceneManagerRef.current.switchWorld('GARDEN');
+                  }
+                }}
+                className={`text-[10px] font-bold py-1 px-2.5 rounded-lg border transition ${currentWorld === 'GARDEN' ? 'bg-emerald-600 border-emerald-400 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+              >
+                🏡 Garden
+              </button>
+              <button
+                onClick={() => {
+                  if (sceneManagerRef.current && currentWorld !== 'MYSTIC_VALLEY') {
+                    sceneManagerRef.current.switchWorld('MYSTIC_VALLEY');
+                  }
+                }}
+                className={`text-[10px] font-bold py-1 px-2.5 rounded-lg border transition ${currentWorld === 'MYSTIC_VALLEY' ? 'bg-purple-600 border-purple-400 text-white' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+              >
+                ⚔️ Mystic Valley
+              </button>
             </div>
           </div>
 
@@ -256,7 +301,7 @@ export default function SolanderGamePage() {
           {/* Action Buttons & Desktop Controls Helper */}
           <div className="flex flex-col items-center gap-2">
             {/* Context Proximity Prompt Button */}
-            {activePrompt ? (
+            {activePrompt && (
               <button
                 onClick={handleTriggerInteraction}
                 className="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-extrabold text-sm py-3 px-6 rounded-full shadow-xl border-2 border-sky-300/60 flex items-center gap-2 transform active:scale-95 transition-all animate-pulse"
@@ -264,21 +309,50 @@ export default function SolanderGamePage() {
                 <span>{activePrompt.actionText}</span>
                 <span className="bg-sky-700 text-sky-100 px-2 py-0.5 rounded-md text-xs font-mono">E</span>
               </button>
-            ) : (
-              <div className="bg-slate-900/70 backdrop-blur-md text-slate-300 text-xs px-3 py-1.5 rounded-full border border-slate-800">
-                WASD / Joystick to Walk • Drag to Look
-              </div>
             )}
 
-            {/* Jump Button */}
-            <button
-              onClick={handleTriggerJump}
-              className="bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs py-2 px-5 rounded-full border border-slate-700 flex items-center gap-1.5 shadow-lg active:scale-95 transition"
-            >
-              <Footprints className="w-4 h-4 text-emerald-400" />
-              <span>Jump</span>
-              <span className="text-[10px] text-slate-400 font-mono">(Space)</span>
-            </button>
+            {/* Quick Interaction & Combat Action Bar */}
+            <div className="flex items-center gap-2">
+              {/* Spin Attack Button */}
+              <button
+                onClick={handleTriggerAttack}
+                className="bg-rose-600/90 hover:bg-rose-500 text-white font-bold text-xs py-2 px-4 rounded-2xl border border-rose-400/50 flex items-center gap-1.5 shadow-lg active:scale-95 transition"
+                title="Melee Spin Attack"
+              >
+                <Zap className="w-4 h-4 text-amber-300" />
+                <span>Spin Attack</span>
+                <span className="text-[10px] text-rose-200 font-mono">(Space)</span>
+              </button>
+
+              {/* Carry / Drop Chao Button */}
+              <button
+                onClick={handleTriggerCarry}
+                className={`${isCarryingState ? 'bg-amber-600 border-amber-400' : 'bg-indigo-600 border-indigo-400'} hover:opacity-90 text-white font-bold text-xs py-2 px-4 rounded-2xl border flex items-center gap-1.5 shadow-lg active:scale-95 transition`}
+                title="Pick up or set down Chao"
+              >
+                <Heart className="w-4 h-4 text-pink-300" />
+                <span>{isCarryingState ? 'Put Down Chao' : 'Carry Chao'}</span>
+              </button>
+
+              {/* Choose Companion Roster Button */}
+              <button
+                onClick={() => setShowRosterModal(true)}
+                className="bg-slate-800 hover:bg-slate-700 text-sky-300 font-bold text-xs py-2 px-4 rounded-2xl border border-sky-500/40 flex items-center gap-1.5 shadow-lg active:scale-95 transition"
+                title="Choose active follower"
+              >
+                <Sparkles className="w-4 h-4 text-sky-400" />
+                <span>Select Companion</span>
+              </button>
+
+              {/* Jump Button */}
+              <button
+                onClick={handleTriggerJump}
+                className="bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-bold text-xs py-2 px-3.5 rounded-2xl border border-slate-700 flex items-center gap-1 shadow-lg active:scale-95 transition"
+              >
+                <Footprints className="w-4 h-4 text-emerald-400" />
+                <span>Jump</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -468,6 +542,66 @@ export default function SolanderGamePage() {
               className="mt-5 w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 rounded-xl text-xs transition"
             >
               Resume Journey
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Choose Follower Companion Roster Modal */}
+      {showRosterModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-sky-500/50 rounded-3xl p-6 max-w-md w-full shadow-2xl text-white relative animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setShowRosterModal(false)}
+              className="absolute top-4 right-4 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white p-2 rounded-full transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
+              <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-400 flex items-center justify-center text-sky-300 font-black text-xl">
+                🌟
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-100">Select Companion Follower</h2>
+                <p className="text-xs text-sky-400 font-medium">Choose which Chao travels with you on adventures</p>
+              </div>
+            </div>
+
+            <div className="my-4 max-h-60 overflow-y-auto space-y-2.5 pr-1">
+              {saveSystem.getAllCreatures().map((c) => {
+                const isSelected = companion?.id === c.id;
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => handleSelectCompanion(c.id)}
+                    className={`p-3.5 rounded-2xl border flex items-center justify-between cursor-pointer transition ${isSelected ? 'bg-sky-950/80 border-sky-400 shadow-md' : 'bg-slate-800/80 border-slate-700 hover:bg-slate-700/80'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-sky-500/30 border border-sky-300 flex items-center justify-center font-bold text-sky-200 text-sm">
+                        {c.name[0]}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-slate-100">{c.name}</h4>
+                        <p className="text-[11px] text-slate-400">Personality: {c.personality} • Form: {c.form}</p>
+                      </div>
+                    </div>
+
+                    <button
+                      className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition ${isSelected ? 'bg-sky-500 text-white border-sky-300' : 'bg-slate-700 text-slate-300 border-slate-600'}`}
+                    >
+                      {isSelected ? 'Active ✨' : 'Select'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setShowRosterModal(false)}
+              className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2.5 rounded-xl text-xs transition border border-slate-700"
+            >
+              Close
             </button>
           </div>
         </div>

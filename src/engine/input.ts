@@ -10,6 +10,7 @@ export class InputManager {
   public lookDelta: { x: number; y: number } = { x: 0, y: 0 };
   public isInteractPressed: boolean = false;
   public isJumpPressed: boolean = false;
+  public isAttackPressed: boolean = false;
   public isMouseDown: boolean = false;
 
   private touchJoystickActive: boolean = false;
@@ -100,6 +101,12 @@ export class InputManager {
   public consumeJump(): boolean {
     const pressed = this.isJumpPressed;
     this.isJumpPressed = false;
+    return pressed;
+  }
+
+  public consumeAttack(): boolean {
+    const pressed = this.isAttackPressed;
+    this.isAttackPressed = false;
     return pressed;
   }
 }

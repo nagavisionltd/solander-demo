@@ -9,6 +9,7 @@ import { SolanderCreature } from '../creatures/solander';
 import { CompanionAIController } from '../creatures/companionAI';
 import { InteractionManager, ActivePrompt } from '../systems/interaction';
 import { saveSystem } from '../systems/save';
+import { sound } from '../systems/audio';
 
 export class GameSceneManager {
   public renderer: THREE.WebGLRenderer;
@@ -156,6 +157,93 @@ export class GameSceneManager {
     }
   };
 
+  public handlePlayerAttack() {
+    if (this.player.isAttacking) return;
+    this.player.isAttacking = true;
+    sound.playSpinAttackSound();
+
+    setTimeout(() => {
+      this.player.isAttacking = false;
+    }, 450);
+
+    // In Mystic Valley, check collision with Void Enemies
+    if (this.currentWorld === 'MYSTIC_VALLEY') {
+      this.mysticValleyWorld.enemies.forEach(enemy => {
+        if (enemy.alive) {
+          const dist = this.player.position.distanceTo(enemy.position);
+          if (dist < 2.8) {
+            enemy.hp -= 1;
+            sound.playChirp();
+            if (enemy.eyeMesh.material instanceof THREE.MeshStandardMaterial) {
+              enemy.eyeMesh.material.emissive.setHex(0xffffff);
+              setTimeout(() => {
+                if (enemy.eyeMesh.material instanceof THREE.MeshStandardMaterial) {
+                  enemy.eyeMesh.material.emissive.setHex(0xd97706);
+                }
+              }, 200);
+            }
+
+            if (enemy.hp <= 0) {
+              enemy.alive = false;
+              enemy.mesh.visible = false;
+              sound.playEnemyDefeat();
+              saveSystem.collectResource('essence', 2);
+              saveSystem.setMessage(`💥 Defeated Void Shade! Gained +2 ✨ Solander Essence!`);
+            }
+          }
+        }
+      });
+    }
+  }
+
+  public toggleCarryCompanion() {
+    if (this.player.isCarrying) {
+      // Put down
+      this.player.isCarrying = false;
+      if (this.companionCreature) {
+        this.companionCreature.isCarried = false;
+        this.companionCreature.position.copy(this.player.position);
+        this.companionCreature.position.x += 0.8;
+      }
+      sound.playChirp();
+      saveSystem.setMessage('Gently set down your Solander.');
+    } else {
+      // Pick up nearest companion
+      let nearest: SolanderCreature | null = null;
+      let minDist = 3.0;
+      this.creatures.forEach(c => {
+        const d = this.player.position.distanceTo(c.position);
+        if (d < minDist) {
+          minDist = d;
+          nearest = c;
+        }
+      });
+
+      if (nearest) {
+        this.player.isCarrying = true;
+        (nearest as SolanderCreature).isCarried = true;
+        this.companionCreature = nearest;
+        sound.playChirp();
+        saveSystem.setMessage(`Picked up ${(nearest as SolanderCreature).data.name}!`);
+      }
+    }
+  }
+
+  public selectCompanion(creatureId: string) {
+    const target = this.creatures.find(c => c.data.id === creatureId);
+    if (!target) return;
+
+    this.aiControllers.forEach(ai => {
+      const isTarget = ai.creature.data.id === creatureId;
+      ai.setCompanionStatus(isTarget);
+    });
+
+    this.companionCreature = target;
+    saveSystem.setCompanion(target.data.id);
+    sound.playHatchChime();
+    saveSystem.setMessage(`🌟 ${target.data.name} is now your active companion!`);
+  }
+
   public handleInteractAction() {
     if (this.interactionManager.currentPrompt) {
       this.interactionManager.executeInteraction(
@@ -274,8 +362,20 @@ export class GameSceneManager {
       this.handleInteractAction();
     }
 
+    // Player Attack / Spin Attack Action
+    if (inputManager.consumeAttack()) {
+      this.handlePlayerAttack();
+    }
+
     // Player Movement Update
     this.player.update(inputVec, this.cameraSystem, deltaTime, this.getGroundHeight, doJump);
+
+    // Player Water Detection & Swimming
+    const inWater = this.gardenWorld.isPosInWater(this.player.position.x, this.player.position.z);
+    if (inWater !== this.player.isSwimming) {
+      this.player.isSwimming = inWater;
+      if (inWater) sound.playSplash();
+    }
 
     // Camera Follow
     this.cameraSystem.update(this.player.position, deltaTime);
@@ -291,8 +391,20 @@ export class GameSceneManager {
 
     // Creatures & Companion AI Update
     this.aiControllers.forEach(ai => {
-      ai.update(deltaTime, this.player.position, this.getGroundHeight);
+      ai.update(
+        deltaTime,
+        this.player.position,
+        this.getGroundHeight,
+        (x, z) => this.currentWorld === 'GARDEN' && this.gardenWorld.isPosInWater(x, z)
+      );
     });
+
+    // Handle carrying attachment position
+    if (this.player.isCarrying && this.companionCreature) {
+      this.companionCreature.isCarried = true;
+      this.companionCreature.position.copy(this.player.position);
+      this.companionCreature.position.y += 1.4;
+    }
 
     // Check Interactive Proximity Prompt
     const prompt = this.interactionManager.update(

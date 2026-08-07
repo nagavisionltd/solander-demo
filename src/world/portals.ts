@@ -34,16 +34,51 @@ export class PortalCave {
     // Swirling Portal Vortex Disk
     const vortexGeo = new THREE.CircleGeometry(1.9, 32);
     const vortexMat = new THREE.MeshStandardMaterial({
-      color: 0x6366f1,
-      emissive: 0x3b82f6,
-      emissiveIntensity: 0.8,
+      color: targetWorld === 'MYSTIC_VALLEY' ? 0xa855f7 : 0x38bdf8,
+      emissive: targetWorld === 'MYSTIC_VALLEY' ? 0x9333ea : 0x0284c7,
+      emissiveIntensity: 0.9,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.85
+      opacity: 0.88
     });
     this.vortexMesh = new THREE.Mesh(vortexGeo, vortexMat);
     this.vortexMesh.position.y = 0;
     this.mesh.add(this.vortexMesh);
+
+    // Obvious World Gateway Sign Board & Beacon
+    const signGroup = new THREE.Group();
+    signGroup.position.set(0, 2.8, 0);
+
+    const signBoardGeo = new THREE.BoxGeometry(3.6, 0.9, 0.2);
+    const signBoardMat = new THREE.MeshToonMaterial({
+      color: targetWorld === 'MYSTIC_VALLEY' ? 0x581c87 : 0x0369a1
+    });
+    const signBoard = new THREE.Mesh(signBoardGeo, signBoardMat);
+    signGroup.add(signBoard);
+
+    // Glowing Sign Border
+    const borderGeo = new THREE.BoxGeometry(3.8, 1.1, 0.15);
+    const borderMat = new THREE.MeshStandardMaterial({
+      color: targetWorld === 'MYSTIC_VALLEY' ? 0xc084fc : 0x38bdf8,
+      emissive: targetWorld === 'MYSTIC_VALLEY' ? 0xa855f7 : 0x0284c7,
+      emissiveIntensity: 1.2
+    });
+    const border = new THREE.Mesh(borderGeo, borderMat);
+    border.position.z = -0.05;
+    signGroup.add(border);
+
+    // Floating Crystal Beacon Top
+    const beaconGeo = new THREE.OctahedronGeometry(0.45, 0);
+    const beaconMat = new THREE.MeshStandardMaterial({
+      color: targetWorld === 'MYSTIC_VALLEY' ? 0xe9d5ff : 0xe0f2fe,
+      emissive: targetWorld === 'MYSTIC_VALLEY' ? 0xc084fc : 0x38bdf8,
+      emissiveIntensity: 1.5
+    });
+    const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+    beacon.position.y = 0.8;
+    signGroup.add(beacon);
+
+    this.mesh.add(signGroup);
 
     // Position cave archway on ground
     this.mesh.position.copy(position);

@@ -19,10 +19,22 @@ export interface ResourceNode {
   collected: boolean;
 }
 
+export interface VoidEnemy {
+  id: string;
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  mesh: THREE.Group;
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  eyeMesh: THREE.Mesh;
+}
+
 export class MysticValleyWorld {
   public group: THREE.Group;
   public discoveryPoints: DiscoveryPoint[] = [];
   public resourceNodes: ResourceNode[] = [];
+  public enemies: VoidEnemy[] = [];
   public trialPedestal: { position: THREE.Vector3; mesh: THREE.Group } | null = null;
   private floatingCrystals: THREE.Mesh[] = [];
 
@@ -36,6 +48,7 @@ export class MysticValleyWorld {
     this.buildDiscoveryPoints();
     this.buildResourceNodes();
     this.buildTrialPedestal();
+    this.spawnVoidEnemies();
   }
 
   public getGroundHeight(x: number, z: number): number {
@@ -352,6 +365,48 @@ export class MysticValleyWorld {
     };
   }
 
+  public spawnVoidEnemies() {
+    const enemySpawns = [
+      [-10, 5], [12, -10], [5, 14], [-14, -8], [15, 8]
+    ];
+
+    const bodyGeo = new THREE.DodecahedronGeometry(0.55, 1);
+    const bodyMat = new THREE.MeshToonMaterial({ color: 0x1e1b4b }); // Dark void indigo
+    const eyeGeo = new THREE.SphereGeometry(0.12, 12, 12);
+    const eyeMat = new THREE.MeshStandardMaterial({
+      color: 0xef4444,
+      emissive: 0xd97706,
+      emissiveIntensity: 1.2
+    });
+
+    enemySpawns.forEach(([x, z], idx) => {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 0.55;
+
+      const eye = new THREE.Mesh(eyeGeo, eyeMat);
+      eye.position.set(0, 0.62, 0.45);
+
+      g.add(body, eye);
+
+      const h = this.getGroundHeight(x, z);
+      const pos = new THREE.Vector3(x, h, z);
+      g.position.copy(pos);
+      this.group.add(g);
+
+      this.enemies.push({
+        id: `void_shade_${idx}`,
+        position: pos,
+        velocity: new THREE.Vector3(),
+        mesh: g,
+        hp: 2,
+        maxHp: 2,
+        alive: true,
+        eyeMesh: eye
+      });
+    });
+  }
+
   public update(time: number) {
     // Animate floating crystals bobbing & rotating
     this.floatingCrystals.forEach((c, i) => {
@@ -365,6 +420,15 @@ export class MysticValleyWorld {
       if (!node.collected) {
         node.mesh.position.y = node.position.y + Math.sin(time * 3 + i) * 0.08;
         node.mesh.rotation.y += 0.015;
+      }
+    });
+
+    // Animate active Void Enemies
+    this.enemies.forEach((enemy, i) => {
+      if (enemy.alive) {
+        enemy.mesh.position.y = enemy.position.y + Math.sin(time * 4 + i) * 0.12;
+        enemy.mesh.rotation.y = Math.sin(time * 1.5 + i) * 0.5;
+        enemy.mesh.scale.setScalar(1 + Math.sin(time * 6 + i) * 0.05);
       }
     });
   }

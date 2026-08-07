@@ -10,8 +10,11 @@ export interface SolanderEggMesh {
 export class SolanderGardenWorld {
   public group: THREE.Group;
   public eggs: SolanderEggMesh[] = [];
-  private fireflies: THREE.Points;
-  private waterMesh: THREE.Mesh;
+  private fireflies!: THREE.Points;
+  public waterMesh!: THREE.Mesh;
+  private waterfallStream!: THREE.Mesh;
+  public poolCenter: THREE.Vector3 = new THREE.Vector3(0, -0.2, -8);
+  public poolRadius: number = 6.8;
 
   constructor() {
     this.group = new THREE.Group();
@@ -43,20 +46,28 @@ export class SolanderGardenWorld {
     this.fireflies = new THREE.Points(particleGeo, particleMat);
     this.group.add(this.fireflies);
 
-    // Default water reference
     const dummyGeo = new THREE.PlaneGeometry(1, 1);
-    this.waterMesh = new THREE.Mesh(dummyGeo);
+    this.waterfallStream = new THREE.Mesh(dummyGeo);
+  }
+
+  public isPosInWater(x: number, z: number): boolean {
+    const distToPool = Math.hypot(x - this.poolCenter.x, z - this.poolCenter.z);
+    return distToPool < this.poolRadius - 0.5;
   }
 
   public getGroundHeight(x: number, z: number): number {
-    // Gentle undulating rolling hills math
     const d = Math.hypot(x, z);
     if (d > 28) return -2.0; // Boundary drop
 
-    // Pond depression around (x: 6, z: -4, radius ~ 4)
-    const distToPond = Math.hypot(x - 6, z + 4);
-    if (distToPond < 4.5) {
-      return -0.4 - (4.5 - distToPond) * 0.15;
+    // Central Waterfall Swimming Pool (Center: x: 0, z: -8)
+    const distToPool = Math.hypot(x - this.poolCenter.x, z - this.poolCenter.z);
+    if (distToPool < this.poolRadius) {
+      return -0.8 - (this.poolRadius - distToPool) * 0.12; // Underwater bed!
+    }
+
+    // Waterfall Cliff behind pool (z < -14)
+    if (z < -13.5 && Math.abs(x) < 7) {
+      return 4.5 + ( -13.5 - z ) * 0.8;
     }
 
     const h1 = Math.sin(x * 0.15) * Math.cos(z * 0.15) * 0.5;
@@ -84,29 +95,86 @@ export class SolanderGardenWorld {
   }
 
   private buildWaterFeature() {
-    // Pond water mesh
-    const waterGeo = new THREE.CylinderGeometry(4.2, 4.2, 0.1, 32);
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      roughness: 0.1,
-      metalness: 0.2,
+    // 1. Central Large Swimming Pool (Radius ~ 6.8m)
+    const poolWaterGeo = new THREE.CylinderGeometry(this.poolRadius, this.poolRadius, 0.15, 36);
+    const poolWaterMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      emissive: 0x0369a1,
+      emissiveIntensity: 0.3,
+      roughness: 0.05,
+      metalness: 0.1,
       transparent: true,
-      opacity: 0.85
+      opacity: 0.82
     });
-    this.waterMesh = new THREE.Mesh(waterGeo, waterMat);
-    this.waterMesh.position.set(6, -0.3, -4);
+    this.waterMesh = new THREE.Mesh(poolWaterGeo, poolWaterMat);
+    this.waterMesh.position.copy(this.poolCenter);
     this.group.add(this.waterMesh);
 
-    // Lilypads
-    const padGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.02, 12);
+    // Pool Sand Shore Line Ring
+    const shoreGeo = new THREE.RingGeometry(this.poolRadius - 0.2, this.poolRadius + 1.2, 36);
+    const shoreMat = new THREE.MeshToonMaterial({ color: 0xfef08a, side: THREE.DoubleSide });
+    const shore = new THREE.Mesh(shoreGeo, shoreMat);
+    shore.rotation.x = Math.PI / 2;
+    shore.position.set(this.poolCenter.x, 0.02, this.poolCenter.z);
+    this.group.add(shore);
+
+    // 2. High Rock Cliff Waterfall Centerpiece
+    const cliffGroup = new THREE.Group();
+
+    // Large Rock Formation
+    const rockGeo = new THREE.DodecahedronGeometry(3.5, 1);
+    const rockMat = new THREE.MeshToonMaterial({ color: 0x475569 });
+
+    const rock1 = new THREE.Mesh(rockGeo, rockMat);
+    rock1.position.set(-3, 2.5, -15);
+    rock1.scale.set(1.5, 1.8, 1.2);
+
+    const rock2 = new THREE.Mesh(rockGeo, rockMat);
+    rock2.position.set(3, 2.5, -15);
+    rock2.scale.set(1.5, 1.8, 1.2);
+
+    const rockCenter = new THREE.Mesh(rockGeo, rockMat);
+    rockCenter.position.set(0, 3.2, -15.5);
+    rockCenter.scale.set(2.2, 1.4, 1.0);
+
+    cliffGroup.add(rock1, rock2, rockCenter);
+
+    // Waterfall Animated Water Stream Sheet
+    const fallGeo = new THREE.PlaneGeometry(3.2, 5.2, 16, 16);
+    const fallMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x38bdf8,
+      emissiveIntensity: 0.8,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide
+    });
+    this.waterfallStream = new THREE.Mesh(fallGeo, fallMat);
+    this.waterfallStream.position.set(0, 2.2, -13.8);
+    this.waterfallStream.rotation.x = 0.15;
+    cliffGroup.add(this.waterfallStream);
+
+    // Splash Foam Ring at base
+    const foamGeo = new THREE.TorusGeometry(1.8, 0.25, 12, 24);
+    const foamMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75 });
+    const foam = new THREE.Mesh(foamGeo, foamMat);
+    foam.rotation.x = Math.PI / 2;
+    foam.position.set(0, -0.1, -13.2);
+    cliffGroup.add(foam);
+
+    this.group.add(cliffGroup);
+
+    // Lilypads in Pool
+    const padGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.02, 12);
     const padMat = new THREE.MeshToonMaterial({ color: 0x15803d });
     [
-      { x: 5.2, z: -3.5 },
-      { x: 6.8, z: -4.8 },
-      { x: 7.2, z: -3.2 }
+      { x: -2.5, z: -7.2 },
+      { x: 3.2, z: -9.1 },
+      { x: -1.2, z: -5.8 },
+      { x: 2.8, z: -6.5 }
     ].forEach(p => {
       const pad = new THREE.Mesh(padGeo, padMat);
-      pad.position.set(p.x, -0.22, p.z);
+      pad.position.set(p.x, -0.12, p.z);
       this.group.add(pad);
     });
   }
@@ -241,6 +309,16 @@ export class SolanderGardenWorld {
   }
 
   public update(time: number) {
+    // Animate waterfall stream texture / scale pulse
+    if (this.waterfallStream) {
+      this.waterfallStream.scale.x = 1.0 + Math.sin(time * 8) * 0.05;
+    }
+
+    // Animate pool water surface pulse
+    if (this.waterMesh) {
+      this.waterMesh.position.y = this.poolCenter.y + Math.sin(time * 2) * 0.03;
+    }
+
     // Animate glowing eggs gentle bobbing & wobble
     this.eggs.forEach((egg, idx) => {
       if (!egg.hatched) {

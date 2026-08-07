@@ -23,6 +23,13 @@ export class SolanderCreature {
   public isHappyJump: boolean = false;
   private happyJumpTimer: number = 0;
 
+  // New Behavioral States
+  public isCarried: boolean = false;
+  public isSleeping: boolean = false;
+  public isSwimming: boolean = false;
+
+  private zzzTextGroup: THREE.Group;
+
   constructor(data: SolanderCreatureData) {
     this.data = data;
     this.mesh = new THREE.Group();
@@ -129,6 +136,18 @@ export class SolanderCreature {
     this.emoteBall.position.set(0, 1.05, 0);
     this.mesh.add(this.emoteBall);
 
+    // --- SLEEPING ZZZ PARTICLES ---
+    this.zzzTextGroup = new THREE.Group();
+    const zMat = new THREE.MeshBasicMaterial({ color: 0x9333ea });
+    const zGeo = new THREE.BoxGeometry(0.08, 0.08, 0.02);
+    for (let i = 0; i < 3; i++) {
+      const zMesh = new THREE.Mesh(zGeo, zMat);
+      zMesh.position.set(0.2 + i * 0.1, 0.7 + i * 0.2, 0);
+      zMesh.visible = false;
+      this.zzzTextGroup.add(zMesh);
+    }
+    this.mesh.add(this.zzzTextGroup);
+
     // --- HEART PARTICLES CONTAINER ---
     this.heartParticles = new THREE.Group();
     const heartMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e, side: THREE.DoubleSide });
@@ -207,25 +226,63 @@ export class SolanderCreature {
       this.crystalHalo.rotation.z += deltaTime * 1.5;
     }
 
+    // Toggle Zzz Sleeping Visuals
+    this.zzzTextGroup.children.forEach((z, idx) => {
+      z.visible = this.isSleeping;
+      if (this.isSleeping) {
+        z.position.y = 0.6 + ((time * 1.5 + idx * 0.4) % 0.8);
+        z.position.x = 0.15 + Math.sin(time * 2 + idx) * 0.08;
+      }
+    });
+
+    if (this.isCarried) {
+      // Held above player head
+      this.mesh.position.copy(this.position);
+      this.mesh.rotation.y = this.rotationY;
+
+      // Legs wiggle happily in air
+      this.leftArm.rotation.z = Math.PI / 2;
+      this.rightArm.rotation.z = -Math.PI / 2;
+      this.leftWing.rotation.z = -1.2 + Math.sin(time * 15) * 0.3;
+      this.rightWing.rotation.z = 1.2 - Math.sin(time * 15) * 0.3;
+      return;
+    }
+
+    if (this.isSleeping) {
+      const groundY = getGroundHeight(this.position.x, this.position.z);
+      this.position.y = groundY + 0.25;
+      this.mesh.position.copy(this.position);
+      this.mesh.rotation.z = 0.4; // Curled up on side sleeping
+      return;
+    } else {
+      this.mesh.rotation.z = 0;
+    }
+
     // Smooth movement position update
-    this.position.addScaledVector(this.velocity, deltaTime);
+    if (!this.isSwimming) {
+      this.position.addScaledVector(this.velocity, deltaTime);
+    }
     const groundY = getGroundHeight(this.position.x, this.position.z);
 
-    // Happy Hop Animation
     let hopY = 0;
-    if (this.isHappyJump) {
+    if (this.isSwimming) {
+      // Floating in pool water
+      this.position.y = -0.1 + Math.sin(time * 4) * 0.06;
+    } else if (this.isHappyJump) {
       this.happyJumpTimer -= deltaTime;
       hopY = Math.abs(Math.sin(this.happyJumpTimer * 12)) * 0.4;
       if (this.happyJumpTimer <= 0) {
         this.isHappyJump = false;
         this.heartParticles.children.forEach(p => p.visible = false);
       }
+      this.position.y = groundY + 0.45 + hopY;
     } else if (this.velocity.lengthSq() > 0.05) {
-      // Walking hop cycle
       hopY = Math.abs(Math.sin(time * 8)) * 0.15;
+      this.position.y = groundY + 0.45 + hopY;
+    } else {
+      this.position.y = groundY + 0.45;
     }
 
-    this.position.y = groundY + 0.45 + hopY;
     this.mesh.position.copy(this.position);
     this.mesh.rotation.y = this.rotationY;
 
@@ -238,7 +295,11 @@ export class SolanderCreature {
 
     // Arm and wing flutter
     const isMoving = this.velocity.lengthSq() > 0.05;
-    if (isMoving) {
+    if (this.isSwimming) {
+      // Swimming Paddle Arms
+      this.leftArm.rotation.z = Math.PI / 3 + Math.sin(time * 10) * 0.4;
+      this.rightArm.rotation.z = -Math.PI / 3 - Math.sin(time * 10) * 0.4;
+    } else if (isMoving) {
       this.leftArm.rotation.z = (Math.PI / 4) + Math.sin(time * 8) * 0.25;
       this.rightArm.rotation.z = (-Math.PI / 4) - Math.sin(time * 8) * 0.25;
     } else {
