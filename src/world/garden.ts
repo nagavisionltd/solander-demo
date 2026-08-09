@@ -195,7 +195,93 @@ export class SolanderGardenWorld {
     }
   }
 
+  private buildGardenToys() {
+    // 1. Grand Piano
+    const pianoGroup = new THREE.Group();
+    const pianoBodyGeo = new THREE.BoxGeometry(1.6, 0.8, 1.2);
+    const pianoMat = new THREE.MeshToonMaterial({ color: 0x0f172a }); // Dark lacquer
+    const pianoBody = new THREE.Mesh(pianoBodyGeo, pianoMat);
+    pianoBody.position.y = 0.8;
+    pianoGroup.add(pianoBody);
+
+    // Keyboard
+    const keyGeo = new THREE.BoxGeometry(1.3, 0.1, 0.35);
+    const keyMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+    const keys = new THREE.Mesh(keyGeo, keyMat);
+    keys.position.set(0, 0.85, 0.5);
+    pianoGroup.add(keys);
+
+    // Bench
+    const benchGeo = new THREE.BoxGeometry(1.0, 0.45, 0.4);
+    const benchMat = new THREE.MeshToonMaterial({ color: 0x78350f });
+    const bench = new THREE.Mesh(benchGeo, benchMat);
+    bench.position.set(0, 0.22, 1.0);
+    pianoGroup.add(bench);
+
+    const pianoH = this.getGroundHeight(6, 2);
+    pianoGroup.position.set(6, pianoH, 2);
+    this.group.add(pianoGroup);
+
+    // 2. Water Slide winding into the pool
+    const slideGroup = new THREE.Group();
+    const ladderGeo = new THREE.CylinderGeometry(0.08, 0.08, 3.2, 8);
+    const ladderMat = new THREE.MeshToonMaterial({ color: 0x38bdf8 });
+    const leftPole = new THREE.Mesh(ladderGeo, ladderMat);
+    leftPole.position.set(-0.6, 1.6, 0);
+    const rightPole = new THREE.Mesh(ladderGeo, ladderMat);
+    rightPole.position.set(0.6, 1.6, 0);
+    slideGroup.add(leftPole, rightPole);
+
+    // Slide Chute
+    const chuteGeo = new THREE.CylinderGeometry(0.7, 0.7, 5.5, 16, 1, true, 0, Math.PI);
+    const chuteMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      roughness: 0.1,
+      metalness: 0.2
+    });
+    const chute = new THREE.Mesh(chuteGeo, chuteMat);
+    chute.rotation.x = -Math.PI / 3;
+    chute.position.set(0, 1.6, -2.2);
+    slideGroup.add(chute);
+
+    slideGroup.position.set(-5, 0, -10);
+    this.group.add(slideGroup);
+
+    // 3. Bouncy Beach Ball
+    const ballGeo = new THREE.SphereGeometry(0.45, 24, 24);
+    const ballMat = new THREE.MeshToonMaterial({ color: 0xf43f5e }); // Red & White stripes
+    const beachBall = new THREE.Mesh(ballGeo, ballMat);
+    const ballH = this.getGroundHeight(-1, 4);
+    beachBall.position.set(-1, ballH + 0.45, 4);
+    beachBall.castShadow = true;
+    this.group.add(beachBall);
+
+    // 4. Nap Hammock
+    const hammockGroup = new THREE.Group();
+    const postGeo = new THREE.CylinderGeometry(0.12, 0.15, 2.5, 8);
+    const postMat = new THREE.MeshToonMaterial({ color: 0x78350f });
+    const post1 = new THREE.Mesh(postGeo, postMat);
+    post1.position.set(-1.8, 1.25, 0);
+    const post2 = new THREE.Mesh(postGeo, postMat);
+    post2.position.set(1.8, 1.25, 0);
+    hammockGroup.add(post1, post2);
+
+    // Cloth Net
+    const netGeo = new THREE.CylinderGeometry(0.5, 0.5, 3.2, 12, 1, true, 0, Math.PI);
+    const netMat = new THREE.MeshToonMaterial({ color: 0xfacc15, side: THREE.DoubleSide });
+    const net = new THREE.Mesh(netGeo, netMat);
+    net.rotation.z = Math.PI / 2;
+    net.position.set(0, 0.6, 0);
+    hammockGroup.add(net);
+
+    const hammockH = this.getGroundHeight(9, -4);
+    hammockGroup.position.set(9, hammockH, -4);
+    this.group.add(hammockGroup);
+  }
+
   private buildFoliageAndProps() {
+    this.buildGardenToys();
+
     // Stylized Low-Poly Trees
     const trunkGeo = new THREE.CylinderGeometry(0.25, 0.35, 2.2, 8);
     const trunkMat = new THREE.MeshToonMaterial({ color: 0x78350f });

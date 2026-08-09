@@ -160,21 +160,58 @@ export class SolanderCreature {
     }
     this.mesh.add(this.heartParticles);
 
-    // --- EVOLUTION FORM VISUALS ---
-    // Crystal Crown / Halo
-    const haloGeo = new THREE.TorusGeometry(0.28, 0.04, 12, 24);
-    const crystalMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 0.8,
-      roughness: 0.1,
-      metalness: 0.8
+    // --- HERO & DARK ALIGNMENT VISUAL ATTACHMENTS ---
+    // Hero Golden Halo
+    const heroHaloGeo = new THREE.TorusGeometry(0.24, 0.035, 12, 24);
+    const heroHaloMat = new THREE.MeshStandardMaterial({
+      color: 0xfde047,
+      emissive: 0xfef08a,
+      emissiveIntensity: 1.0
     });
-    this.crystalHalo = new THREE.Mesh(haloGeo, crystalMat);
-    this.crystalHalo.rotation.x = Math.PI / 2;
-    this.crystalHalo.position.set(0, 0.85, 0);
-    this.crystalHalo.visible = this.data.form === 'CRYSTAL';
-    this.mesh.add(this.crystalHalo);
+    const heroHalo = new THREE.Mesh(heroHaloGeo, heroHaloMat);
+    heroHalo.rotation.x = Math.PI / 2;
+    heroHalo.position.set(0, 0.95, 0);
+    heroHalo.visible = data.alignment === 'HERO';
+    this.headGroup.add(heroHalo);
+
+    // Dark Spiked Horns & Crimson Emote Ball
+    if (data.alignment === 'DARK') {
+      const darkHornGeo = new THREE.ConeGeometry(0.12, 0.45, 8);
+      const darkHornMat = new THREE.MeshToonMaterial({ color: 0x9f1239 });
+      const leftDarkHorn = new THREE.Mesh(darkHornGeo, darkHornMat);
+      leftDarkHorn.position.set(-0.25, 0.45, 0.1);
+      leftDarkHorn.rotation.z = 0.5;
+
+      const rightDarkHorn = new THREE.Mesh(darkHornGeo, darkHornMat);
+      rightDarkHorn.position.set(0.25, 0.45, 0.1);
+      rightDarkHorn.rotation.z = -0.5;
+
+      this.headGroup.add(leftDarkHorn, rightDarkHorn);
+
+      // Crimson emissive emote ball
+      emoteBallMat.color.setHex(0xe11d48);
+      emoteBallMat.emissive.setHex(0xf43f5e);
+    } else if (data.alignment === 'HERO') {
+      emoteBallMat.color.setHex(0x38bdf8);
+      emoteBallMat.emissive.setHex(0x7dd3fc);
+    }
+
+    // --- STAT-DRIVEN PHYSICAL GROWTH & SCALING ---
+    // High Swim stat expands flippers/feet width
+    const swimScale = 1 + (data.swimStat || 0) * 0.008;
+    leftFoot.scale.set(swimScale * 1.2, swimScale, swimScale * 1.3);
+    rightFoot.scale.set(swimScale * 1.2, swimScale, swimScale * 1.3);
+
+    // High Power stat expands shoulders/torso and arms
+    const powerScale = 1 + (data.powerStat || 0) * 0.007;
+    torso.scale.set(0.9 * powerScale, 1.1 * powerScale, 0.85 * powerScale);
+    this.leftArm.scale.set(powerScale, powerScale * 1.2, powerScale);
+    this.rightArm.scale.set(powerScale, powerScale * 1.2, powerScale);
+
+    // High Fly stat expands wing size
+    const flyScale = 1 + (data.flyStat || 0) * 0.012;
+    this.leftWing.scale.set(flyScale, flyScale * 1.4, flyScale);
+    this.rightWing.scale.set(flyScale, flyScale * 1.4, flyScale);
 
     // Sky Wings expansion
     this.skyWingsGroup = new THREE.Group();

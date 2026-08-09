@@ -8,7 +8,7 @@ import { PortalCave } from '../world/portals';
 import { SolanderCreature } from '../creatures/solander';
 import { CompanionAIController } from '../creatures/companionAI';
 import { InteractionManager, ActivePrompt } from '../systems/interaction';
-import { saveSystem } from '../systems/save';
+import { saveSystem, SolanderCreatureData } from '../systems/save';
 import { sound } from '../systems/audio';
 
 export class GameSceneManager {
@@ -367,15 +367,19 @@ export class GameSceneManager {
       this.handlePlayerAttack();
     }
 
-    // Player Movement Update
-    this.player.update(inputVec, this.cameraSystem, deltaTime, this.getGroundHeight, doJump);
+    // Player Carry Action
+    if (inputManager.consumeCarry()) {
+      this.toggleCarryCompanion();
+    }
 
     // Player Water Detection & Swimming
-    const inWater = this.gardenWorld.isPosInWater(this.player.position.x, this.player.position.z);
-    if (inWater !== this.player.isSwimming) {
-      this.player.isSwimming = inWater;
-      if (inWater) sound.playSplash();
+    const inWater = this.currentWorld === 'GARDEN' && this.gardenWorld.isPosInWater(this.player.position.x, this.player.position.z);
+    if (inWater && !this.player.isSwimming) {
+      sound.playSplash();
     }
+
+    // Player Movement Update
+    this.player.update(inputVec, this.cameraSystem, deltaTime, this.getGroundHeight, doJump, inWater);
 
     // Camera Follow
     this.cameraSystem.update(this.player.position, deltaTime);
@@ -404,6 +408,68 @@ export class GameSceneManager {
       this.companionCreature.isCarried = true;
       this.companionCreature.position.copy(this.player.position);
       this.companionCreature.position.y += 1.4;
+    }
+
+    // Automatic Random Egg Hatching Over Time
+    if (this.currentWorld === 'GARDEN') {
+      const unhatchedEgg = this.gardenWorld.eggs.find(e => !e.hatched);
+      if (unhatchedEgg) {
+        if (!unhatchedEgg.mesh.userData.hatchTimer) {
+          unhatchedEgg.mesh.userData.hatchTimer = 45 + Math.random() * 45; // 45-90 seconds
+        }
+        unhatchedEgg.mesh.userData.hatchTimer -= deltaTime;
+        if (unhatchedEgg.mesh.userData.hatchTimer <= 0) {
+          unhatchedEgg.hatched = true;
+          unhatchedEgg.mesh.visible = false;
+          sound.playHatchChime();
+
+          const creatureName = unhatchedEgg.name.replace(' Egg', '');
+          saveSystem.hatchEgg(unhatchedEgg.id, creatureName);
+
+          // Spawn new Solander creature into world
+          const newCreatureData: SolanderCreatureData = saveSystem.getAllCreatures().find(c => c.id === unhatchedEgg.id) || {
+            id: unhatchedEgg.id,
+            name: creatureName,
+            species: 'Chao Solander',
+            personality: 'Playful',
+            happiness: 80,
+            curiosity: 20,
+            bravery: 18,
+            energy: 25,
+            creativity: 15,
+            bond: 25,
+            bodyColor: 0x38bdf8,
+            accentColor: 0xfacc15,
+            isCompanion: false,
+            hatched: true,
+            originWorld: 'Solander Garden',
+            form: 'DEFAULT',
+            alignment: 'NEUTRAL',
+            alignmentScore: 0,
+            swimStat: 15,
+            flyStat: 15,
+            runStat: 15,
+            powerStat: 15,
+            staminaStat: 15,
+            dancingSkill: 0,
+            singingSkill: 0,
+            drawingSkill: 0,
+            raceTrophies: 0,
+            karateBelts: 0
+          };
+
+          const creature = new SolanderCreature(newCreatureData);
+          const eggPos = unhatchedEgg.mesh.position;
+          creature.position.set(eggPos.x, this.getGroundHeight(eggPos.x, eggPos.z), eggPos.z);
+          const ai = new CompanionAIController(creature, false);
+          this.aiControllers.push(ai);
+          this.creatures.push(creature);
+          this.gardenWorld.group.add(creature.mesh);
+
+          creature.triggerHappyReaction();
+          saveSystem.setMessage(`🐣 An egg in the garden naturally hatched into ${creatureName}! It is now exploring the garden.`);
+        }
+      }
     }
 
     // Check Interactive Proximity Prompt

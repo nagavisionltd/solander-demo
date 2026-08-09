@@ -12,18 +12,20 @@ export class Player {
 
   private headGroup: THREE.Group;
   private bodyMesh: THREE.Mesh;
+  private tailGroup: THREE.Group;
   private leftArm: THREE.Group;
   private rightArm: THREE.Group;
   private leftLeg: THREE.Group;
   private rightLeg: THREE.Group;
 
   private spinTrail: THREE.Mesh;
+  private energyBallMesh: THREE.Mesh;
 
   private walkCycleTimer: number = 0;
   private isGrounded: boolean = true;
   private stepSoundTimer: number = 0;
 
-  public moveSpeed: number = 6.5;
+  public moveSpeed: number = 7.2; // Fast Sonic/Sonic Adventure hero speed!
 
   // Actions / States
   public isAttacking: boolean = false;
@@ -40,144 +42,221 @@ export class Player {
   constructor() {
     this.mesh = new THREE.Group();
 
-    // Materials - Vibrant mascot colors (Sky Blue & Coral Pink accents, Crisp White gloves/chest)
-    const skinMat = new THREE.MeshToonMaterial({ color: 0x38bdf8 }); // Sky blue Kirby-style hero body
-    const chestMat = new THREE.MeshToonMaterial({ color: 0xfff1f2 }); // Soft white tummy
-    const gloveMat = new THREE.MeshToonMaterial({ color: 0xffffff }); // White cartoon gloves
-    const shoeMat = new THREE.MeshToonMaterial({ color: 0xf43f5e }); // Bright red/coral running boots
-    const earSpikeMat = new THREE.MeshToonMaterial({ color: 0xfacc15 }); // Golden crest/ear spikes
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a }); // Deep dark eye pupils
+    // Color Palette based on Neelo character art
+    const furMat = new THREE.MeshToonMaterial({ color: 0x3b0764 }); // Deep purple panther fur
+    const spotGoldMat = new THREE.MeshBasicMaterial({ color: 0xeab308 }); // Gold spots
+    const spotCyanMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 }); // Cyan spots
+    const innerEarMat = new THREE.MeshToonMaterial({ color: 0x8b5cf6 }); // Light purple inner ear
+    const muzzleMat = new THREE.MeshToonMaterial({ color: 0x2e1065 }); // Muzzle/snout
+    const noseMat = new THREE.MeshToonMaterial({ color: 0xf43f5e }); // Pinkish feline nose
+    const fangMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // White sharp fangs
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b }); // Golden/hazel hero eye
+    const pupilMat = new THREE.MeshBasicMaterial({ color: 0x020617 }); // Dark eye pupil
     const eyeGlintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-    // 1. Main Round Torso / Body (Tall Kirby / Mascot proportions)
-    const bodyGeo = new THREE.SphereGeometry(0.55, 24, 24);
-    bodyGeo.scale(0.9, 1.25, 0.9); // Tall round mascot shape
-    this.bodyMesh = new THREE.Mesh(bodyGeo, skinMat);
+    // Apparel - Cool Fitted T-Shirt
+    const tShirtMat = new THREE.MeshToonMaterial({ color: 0x0284c7 }); // Vibrant teal/cyan T-shirt
+    const neckMat = new THREE.MeshToonMaterial({ color: 0x38bdf8 }); // T-shirt crewneck trim
+    const shortsMat = new THREE.MeshToonMaterial({ color: 0x78350f }); // Brown shorts
+    const shoeMat = new THREE.MeshToonMaterial({ color: 0x581c87 }); // Purple sneaker
+    const soleMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc }); // White shoe soles
+
+    // 1. Torso / Body (Fitted T-Shirt)
+    const bodyGeo = new THREE.CylinderGeometry(0.48, 0.44, 0.72, 20);
+    this.bodyMesh = new THREE.Mesh(bodyGeo, tShirtMat);
     this.bodyMesh.position.y = 0.95;
     this.bodyMesh.castShadow = true;
     this.mesh.add(this.bodyMesh);
 
-    // Tummy patch
-    const tummyGeo = new THREE.SphereGeometry(0.38, 16, 16);
-    tummyGeo.scale(0.8, 1.0, 0.5);
-    const tummy = new THREE.Mesh(tummyGeo, chestMat);
-    tummy.position.set(0, 0.92, 0.28);
-    this.mesh.add(tummy);
+    // T-shirt Crewneck Collar Trim
+    const neckGeo = new THREE.TorusGeometry(0.28, 0.045, 12, 24);
+    neckGeo.rotateX(Math.PI / 2);
+    const neckCollar = new THREE.Mesh(neckGeo, neckMat);
+    neckCollar.position.set(0, 1.31, 0);
+    this.mesh.add(neckCollar);
 
-    // 2. Head Group
+    // T-shirt Short Sleeves
+    const sleeveGeo = new THREE.CylinderGeometry(0.18, 0.19, 0.28, 16);
+    const leftSleeve = new THREE.Mesh(sleeveGeo, tShirtMat);
+    leftSleeve.position.set(-0.42, 1.15, 0);
+    leftSleeve.rotation.z = -0.4;
+
+    const rightSleeve = new THREE.Mesh(sleeveGeo, tShirtMat);
+    rightSleeve.position.set(0.42, 1.15, 0);
+    rightSleeve.rotation.z = 0.4;
+
+    this.mesh.add(leftSleeve, rightSleeve);
+
+    // Shorts
+    const shortsGeo = new THREE.CylinderGeometry(0.46, 0.42, 0.35, 16);
+    const shorts = new THREE.Mesh(shortsGeo, shortsMat);
+    shorts.position.set(0, 0.55, 0);
+    this.mesh.add(shorts);
+
+    // 2. Head Group (Neelo Panther Head)
     this.headGroup = new THREE.Group();
-    this.headGroup.position.y = 1.45;
+    this.headGroup.position.y = 1.48;
 
-    // Head Sphere
+    // Head Base Sphere
     const headGeo = new THREE.SphereGeometry(0.48, 24, 24);
-    const headMesh = new THREE.Mesh(headGeo, skinMat);
+    const headMesh = new THREE.Mesh(headGeo, furMat);
     headMesh.castShadow = true;
     this.headGroup.add(headMesh);
 
-    // Cute Mascot Ears / Spikes (Sonic/Kirby hybrid crest)
-    const spikeGeo = new THREE.ConeGeometry(0.18, 0.5, 12);
-    spikeGeo.rotateX(-0.4);
+    // Panther Ear L & R
+    const earOuterGeo = new THREE.SphereGeometry(0.18, 12, 12);
+    earOuterGeo.scale(1.0, 1.2, 0.6);
+    const earInnerGeo = new THREE.SphereGeometry(0.13, 12, 12);
+    earInnerGeo.scale(0.8, 1.0, 0.5);
 
-    const leftSpike = new THREE.Mesh(spikeGeo, earSpikeMat);
-    leftSpike.position.set(-0.28, 0.35, -0.15);
-    leftSpike.rotation.z = -0.35;
+    const leftEar = new THREE.Mesh(earOuterGeo, furMat);
+    leftEar.position.set(-0.36, 0.38, -0.05);
+    leftEar.rotation.z = -0.3;
+    const leftInnerEar = new THREE.Mesh(earInnerGeo, innerEarMat);
+    leftInnerEar.position.set(-0.35, 0.38, 0.02);
+    leftInnerEar.rotation.z = -0.3;
 
-    const rightSpike = new THREE.Mesh(spikeGeo, earSpikeMat);
-    rightSpike.position.set(0.28, 0.35, -0.15);
-    rightSpike.rotation.z = 0.35;
+    const rightEar = new THREE.Mesh(earOuterGeo, furMat);
+    rightEar.position.set(0.36, 0.38, -0.05);
+    rightEar.rotation.z = 0.3;
+    const rightInnerEar = new THREE.Mesh(earInnerGeo, innerEarMat);
+    rightInnerEar.position.set(0.35, 0.38, 0.02);
+    rightInnerEar.rotation.z = 0.3;
 
-    const centerSpike = new THREE.Mesh(spikeGeo, earSpikeMat);
-    centerSpike.position.set(0, 0.45, -0.2);
-    centerSpike.rotation.x = -0.3;
+    this.headGroup.add(leftEar, leftInnerEar, rightEar, rightInnerEar);
 
-    this.headGroup.add(leftSpike, rightSpike, centerSpike);
+    // Muzzle / Snout
+    const muzzleGeo = new THREE.BoxGeometry(0.32, 0.22, 0.24);
+    const muzzle = new THREE.Mesh(muzzleGeo, muzzleMat);
+    muzzle.position.set(0, -0.08, 0.36);
 
-    // Expressive Large Eyes
-    const eyeGeo = new THREE.SphereGeometry(0.12, 12, 12);
-    eyeGeo.scale(0.65, 1.2, 0.4);
+    // Feline Nose
+    const noseGeo = new THREE.SphereGeometry(0.06, 8, 8);
+    const nose = new THREE.Mesh(noseGeo, noseMat);
+    nose.position.set(0, 0.02, 0.48);
+
+    // White Fangs
+    const fangGeo = new THREE.ConeGeometry(0.035, 0.1, 8);
+    fangGeo.rotateX(Math.PI);
+    const leftFang = new THREE.Mesh(fangGeo, fangMat);
+    leftFang.position.set(-0.09, -0.15, 0.46);
+    const rightFang = new THREE.Mesh(fangGeo, fangMat);
+    rightFang.position.set(0.09, -0.15, 0.46);
+
+    this.headGroup.add(muzzle, nose, leftFang, rightFang);
+
+    // Expressive Feline Eyes
+    const eyeGeo = new THREE.SphereGeometry(0.11, 12, 12);
+    eyeGeo.scale(1.1, 0.9, 0.4);
 
     const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-    leftEye.position.set(-0.16, 0.06, 0.4);
-
+    leftEye.position.set(-0.17, 0.08, 0.38);
     const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-    rightEye.position.set(0.16, 0.06, 0.4);
+    rightEye.position.set(0.17, 0.08, 0.38);
 
-    // Eye Glints
-    const glintGeo = new THREE.SphereGeometry(0.04, 8, 8);
+    const pupilGeo = new THREE.SphereGeometry(0.06, 8, 8);
+    pupilGeo.scale(0.5, 1.1, 0.3); // Slit pupil
+    const leftPupil = new THREE.Mesh(pupilGeo, pupilMat);
+    leftPupil.position.set(-0.16, 0.08, 0.42);
+    const rightPupil = new THREE.Mesh(pupilGeo, pupilMat);
+    rightPupil.position.set(0.16, 0.08, 0.42);
+
+    const glintGeo = new THREE.SphereGeometry(0.035, 8, 8);
     const leftGlint = new THREE.Mesh(glintGeo, eyeGlintMat);
-    leftGlint.position.set(-0.14, 0.1, 0.44);
-
+    leftGlint.position.set(-0.14, 0.11, 0.44);
     const rightGlint = new THREE.Mesh(glintGeo, eyeGlintMat);
-    rightGlint.position.set(0.18, 0.1, 0.44);
+    rightGlint.position.set(0.18, 0.11, 0.44);
 
-    // Cheerful Smile Line
-    const mouthGeo = new THREE.TorusGeometry(0.08, 0.02, 8, 12, Math.PI);
-    const mouthMat = new THREE.MeshBasicMaterial({ color: 0x9f1239 });
-    const mouth = new THREE.Mesh(mouthGeo, mouthMat);
-    mouth.rotation.x = Math.PI;
-    mouth.position.set(0, -0.12, 0.42);
+    this.headGroup.add(leftEye, rightEye, leftPupil, rightPupil, leftGlint, rightGlint);
 
-    this.headGroup.add(leftEye, rightEye, leftGlint, rightGlint, mouth);
+    // Gold & Cyan Spots on forehead & shoulders
+    const spotGeo = new THREE.SphereGeometry(0.04, 8, 8);
+    spotGeo.scale(1.2, 0.8, 0.3);
+
+    const spot1 = new THREE.Mesh(spotGeo, spotGoldMat);
+    spot1.position.set(-0.18, 0.28, 0.38);
+    const spot2 = new THREE.Mesh(spotGeo, spotCyanMat);
+    spot2.position.set(0.14, 0.32, 0.37);
+    const spot3 = new THREE.Mesh(spotGeo, spotGoldMat);
+    spot3.position.set(0, 0.36, 0.38);
+
+    this.headGroup.add(spot1, spot2, spot3);
     this.mesh.add(this.headGroup);
 
-    // 3. Cartoon Arms with White Gloves
-    const armArmatureGeo = new THREE.SphereGeometry(0.12, 12, 12);
-    armArmatureGeo.scale(0.8, 1.8, 0.8);
-    const gloveGeo = new THREE.SphereGeometry(0.16, 12, 12);
+    // 3. Panther Curved Tail
+    this.tailGroup = new THREE.Group();
+    this.tailGroup.position.set(0, 0.55, -0.38);
+
+    const tailCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, -0.1, -0.3),
+      new THREE.Vector3(0.15, 0.1, -0.6),
+      new THREE.Vector3(0.25, 0.35, -0.75)
+    ]);
+    const tailGeo = new THREE.TubeGeometry(tailCurve, 12, 0.05, 8, false);
+    const tailMesh = new THREE.Mesh(tailGeo, furMat);
+    this.tailGroup.add(tailMesh);
+    this.mesh.add(this.tailGroup);
+
+    // 4. Arms & Purple Sneakers
+    const armGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.45, 12);
 
     // Left Arm
     this.leftArm = new THREE.Group();
-    const lArmMesh = new THREE.Mesh(armArmatureGeo, skinMat);
-    lArmMesh.position.y = -0.15;
-    const lGlove = new THREE.Mesh(gloveGeo, gloveMat);
-    lGlove.position.y = -0.32;
-    this.leftArm.add(lArmMesh, lGlove);
-    this.leftArm.position.set(-0.48, 1.05, 0);
+    const lArmMesh = new THREE.Mesh(armGeo, furMat);
+    lArmMesh.position.y = -0.2;
+    // Shoulder spot
+    const lSpot = new THREE.Mesh(spotGeo, spotGoldMat);
+    lSpot.position.set(-0.06, -0.1, 0);
+    this.leftArm.add(lArmMesh, lSpot);
+    this.leftArm.position.set(-0.48, 1.1, 0);
     this.mesh.add(this.leftArm);
 
     // Right Arm
     this.rightArm = new THREE.Group();
-    const rArmMesh = new THREE.Mesh(armArmatureGeo, skinMat);
-    rArmMesh.position.y = -0.15;
-    const rGlove = new THREE.Mesh(gloveGeo, gloveMat);
-    rGlove.position.y = -0.32;
-    this.rightArm.add(rArmMesh, rGlove);
-    this.rightArm.position.set(0.48, 1.05, 0);
+    const rArmMesh = new THREE.Mesh(armGeo, furMat);
+    rArmMesh.position.y = -0.2;
+    const rSpot = new THREE.Mesh(spotGeo, spotCyanMat);
+    rSpot.position.set(0.06, -0.1, 0);
+    this.rightArm.add(rArmMesh, rSpot);
+    this.rightArm.position.set(0.48, 1.1, 0);
     this.mesh.add(this.rightArm);
 
-    // 4. Legs with Big Mascot Running Boots
-    const legArmatureGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.3, 12);
-    const shoeGeo = new THREE.SphereGeometry(0.22, 16, 16);
-    shoeGeo.scale(0.9, 0.75, 1.4); // Chunky cartoon shoe
+    // Legs & Sneakers
+    const legGeo = new THREE.CylinderGeometry(0.1, 0.09, 0.4, 12);
+    const shoeGeo = new THREE.BoxGeometry(0.24, 0.22, 0.42);
+    const soleGeo = new THREE.BoxGeometry(0.26, 0.06, 0.44);
 
     // Left Leg
     this.leftLeg = new THREE.Group();
-    const lLegMesh = new THREE.Mesh(legArmatureGeo, skinMat);
-    lLegMesh.position.y = -0.15;
+    const lLegMesh = new THREE.Mesh(legGeo, furMat);
+    lLegMesh.position.y = -0.2;
     const lShoe = new THREE.Mesh(shoeGeo, shoeMat);
-    lShoe.position.set(0, -0.28, 0.08);
-    lShoe.castShadow = true;
-    this.leftLeg.add(lLegMesh, lShoe);
-    this.leftLeg.position.set(-0.22, 0.35, 0);
+    lShoe.position.set(0, -0.32, 0.06);
+    const lSole = new THREE.Mesh(soleGeo, soleMat);
+    lSole.position.set(0, -0.42, 0.06);
+    this.leftLeg.add(lLegMesh, lShoe, lSole);
+    this.leftLeg.position.set(-0.22, 0.45, 0);
     this.mesh.add(this.leftLeg);
 
     // Right Leg
     this.rightLeg = new THREE.Group();
-    const rLegMesh = new THREE.Mesh(legArmatureGeo, skinMat);
-    rLegMesh.position.y = -0.15;
+    const rLegMesh = new THREE.Mesh(legGeo, furMat);
+    rLegMesh.position.y = -0.2;
     const rShoe = new THREE.Mesh(shoeGeo, shoeMat);
-    rShoe.position.set(0, -0.28, 0.08);
-    rShoe.castShadow = true;
-    this.rightLeg.add(rLegMesh, rShoe);
-    this.rightLeg.position.set(0.22, 0.35, 0);
+    rShoe.position.set(0, -0.32, 0.06);
+    const rSole = new THREE.Mesh(soleGeo, soleMat);
+    rSole.position.set(0, -0.42, 0.06);
+    this.rightLeg.add(rLegMesh, rShoe, rSole);
+    this.rightLeg.position.set(0.22, 0.45, 0);
     this.mesh.add(this.rightLeg);
 
-    // 5. Spin Attack Aura / Energy Trail
-    const spinGeo = new THREE.TorusGeometry(0.85, 0.12, 12, 24);
+    // 5. Spin Attack & Energy Projectile Aura
+    const spinGeo = new THREE.TorusGeometry(0.9, 0.14, 16, 28);
     const spinMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 1.5,
+      color: 0x06b6d4,
+      emissive: 0xa855f7,
+      emissiveIntensity: 2.0,
       transparent: true,
       opacity: 0
     });
@@ -185,6 +264,20 @@ export class Player {
     this.spinTrail.rotation.x = Math.PI / 2;
     this.spinTrail.position.y = 0.9;
     this.mesh.add(this.spinTrail);
+
+    // Energy Ball Shield Mesh for Spin Dash / Energy Attack
+    const eBallGeo = new THREE.SphereGeometry(0.85, 20, 20);
+    const eBallMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x9333ea,
+      emissiveIntensity: 1.8,
+      transparent: true,
+      opacity: 0,
+      wireframe: true
+    });
+    this.energyBallMesh = new THREE.Mesh(eBallGeo, eBallMat);
+    this.energyBallMesh.position.y = 0.9;
+    this.mesh.add(this.energyBallMesh);
   }
 
   public triggerAttack(): boolean {
@@ -210,14 +303,23 @@ export class Player {
   ) {
     this.isSwimming = isInWater;
 
-    // Handle Attack Spin Animation
+    // Tail Swish Animation
+    const tailWiggle = Math.sin(Date.now() * 0.006) * 0.25;
+    this.tailGroup.rotation.y = tailWiggle;
+
+    // Handle Attack Spin & Energy Aura Animation
     if (this.isAttacking) {
       this.attackTimer -= deltaTime;
-      this.mesh.rotation.y += deltaTime * 25; // High speed spin roll!
-      (this.spinTrail.material as THREE.MeshStandardMaterial).opacity = Math.sin((0.45 - this.attackTimer) / 0.45 * Math.PI);
+      this.mesh.rotation.y += deltaTime * 28; // High speed spin roll!
+      const op = Math.sin((0.45 - this.attackTimer) / 0.45 * Math.PI);
+      (this.spinTrail.material as THREE.MeshStandardMaterial).opacity = op;
+      (this.energyBallMesh.material as THREE.MeshStandardMaterial).opacity = op * 0.85;
+      this.energyBallMesh.rotation.y += deltaTime * 12;
+
       if (this.attackTimer <= 0) {
         this.isAttacking = false;
         (this.spinTrail.material as THREE.MeshStandardMaterial).opacity = 0;
+        (this.energyBallMesh.material as THREE.MeshStandardMaterial).opacity = 0;
         this.mesh.rotation.y = this.rotationY;
       }
     }
@@ -225,7 +327,7 @@ export class Player {
     // Handle Petting Pose
     if (this.isPetting) {
       this.pettingTimer -= deltaTime;
-      this.bodyMesh.rotation.x = 0.35; // Bending down towards Chao
+      this.bodyMesh.rotation.x = 0.35;
       this.leftArm.rotation.x = -1.2;
       this.rightArm.rotation.x = -1.2;
       if (this.pettingTimer <= 0) {
@@ -253,7 +355,7 @@ export class Player {
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-        this.rotationY += angleDiff * Math.min(1, deltaTime * 12);
+        this.rotationY += angleDiff * Math.min(1, deltaTime * 14);
         this.mesh.rotation.y = this.rotationY;
       }
 
@@ -261,11 +363,11 @@ export class Player {
       this.velocity.x = moveDir.x * speed;
       this.velocity.z = moveDir.z * speed;
 
-      this.walkCycleTimer += deltaTime * (this.isSwimming ? 6 : 12);
+      this.walkCycleTimer += deltaTime * (this.isSwimming ? 6 : 14);
 
       if (!this.isSwimming) {
         this.stepSoundTimer += deltaTime;
-        if (this.stepSoundTimer > 0.32) {
+        if (this.stepSoundTimer > 0.28) {
           sound.playStep();
           this.stepSoundTimer = 0;
         }
@@ -276,32 +378,60 @@ export class Player {
       this.walkCycleTimer = 0;
     }
 
-    // Ground Height & Water Level Physics
+    // Apply Velocity to Position with Collision Checks
+    const nextX = this.position.x + this.velocity.x * deltaTime;
+    const nextZ = this.position.z + this.velocity.z * deltaTime;
+
+    // 1. World Boundary Perimeter Constraint (Island Radius Limit)
+    const maxIslandRadius = 27.2;
+    const distFromCenter = Math.hypot(nextX, nextZ);
+    if (distFromCenter > maxIslandRadius) {
+      const angle = Math.atan2(nextZ, nextX);
+      this.position.x = Math.cos(angle) * maxIslandRadius;
+      this.position.z = Math.sin(angle) * maxIslandRadius;
+    } else {
+      this.position.x = nextX;
+      this.position.z = nextZ;
+    }
+
+    // 2. Obstacle Collision Resolution (Portal Shrine & Rocks)
+    // Portal Shrine Collision at (0, -18)
+    const distToPortal = Math.hypot(this.position.x - 0, this.position.z - (-18));
+    if (distToPortal < 1.8) {
+      const angle = Math.atan2(this.position.z - (-18), this.position.x - 0);
+      this.position.x = Math.cos(angle) * 1.8;
+      this.position.z = -18 + Math.sin(angle) * 1.8;
+    }
+
+    // Waterfall Cliff Solid Wall in Garden World (z < -13.5 and |x| < 6.5)
+    if (this.position.z < -13.2 && Math.abs(this.position.x) < 6.5) {
+      this.position.z = -13.2; // Block player from clipping through waterfall wall
+    }
+
+    // 3. Ground Height & Swimming Physics
     const groundHeight = getGroundHeight(this.position.x, this.position.z);
 
     if (this.isSwimming) {
-      // Water Floating physics
       const waterSurfaceY = 0.25;
       this.position.y = THREE.MathUtils.lerp(this.position.y, waterSurfaceY + Math.sin(Date.now() * 0.005) * 0.08, deltaTime * 5);
       this.velocity.y = 0;
       this.isGrounded = true;
 
       if (doJump) {
-        // Water hop out of pool!
-        this.velocity.y = 7.0;
+        this.velocity.y = 7.5;
         this.isGrounded = false;
-        sound.playSplash();
+        // Light jump hop out of water
+        sound.playStep();
       }
     } else {
-      // Regular Gravity / Jump
       if (doJump && this.isGrounded) {
-        this.velocity.y = 8.5;
+        this.velocity.y = 9.0;
         this.isGrounded = false;
         sound.playStep();
       }
 
-      this.velocity.y -= 22.0 * deltaTime;
-      this.position.addScaledVector(this.velocity, deltaTime);
+      this.velocity.y -= 23.0 * deltaTime;
+      this.position.y += this.velocity.y * deltaTime;
 
       if (this.position.y <= groundHeight) {
         this.position.y = groundHeight;
@@ -312,7 +442,7 @@ export class Player {
 
     this.mesh.position.copy(this.position);
 
-    // Carried Chao Position Update (holds carried Chao above player arms!)
+    // Carried Chao Position Update
     if (this.isCarrying && this.carriedCreature) {
       this.carriedCreature.position.set(this.position.x, this.position.y + 1.8, this.position.z);
       this.carriedCreature.mesh.position.copy(this.carriedCreature.position);
@@ -320,21 +450,18 @@ export class Player {
 
     // Limb Animations
     if (this.isCarrying) {
-      // Arms raised high holding Chao overhead!
       this.leftArm.rotation.x = -Math.PI * 0.85;
       this.leftArm.rotation.z = -0.2;
       this.rightArm.rotation.x = -Math.PI * 0.85;
       this.rightArm.rotation.z = 0.2;
     } else if (this.isSwimming) {
-      // Swimming Paddle Arms & Floating Feet
       const swimPaddle = Math.sin(this.walkCycleTimer) * 0.8;
       this.leftArm.rotation.x = -Math.PI / 2 + swimPaddle;
       this.rightArm.rotation.x = -Math.PI / 2 - swimPaddle;
       this.leftLeg.rotation.x = 0.8 + swimPaddle * 0.3;
       this.rightLeg.rotation.x = 0.8 - swimPaddle * 0.3;
     } else if (isMoving) {
-      // Dynamic Mascot Running Cycle
-      const swing = Math.sin(this.walkCycleTimer) * 0.7;
+      const swing = Math.sin(this.walkCycleTimer) * 0.8;
       this.leftArm.rotation.x = swing;
       this.leftArm.rotation.z = 0;
       this.rightArm.rotation.x = -swing;
@@ -342,7 +469,6 @@ export class Player {
       this.leftLeg.rotation.x = -swing;
       this.rightLeg.rotation.x = swing;
     } else {
-      // Idle Breathing / Bobbing
       const idleBob = Math.sin(Date.now() * 0.004) * 0.04;
       this.leftArm.rotation.x = THREE.MathUtils.lerp(this.leftArm.rotation.x, 0, 0.1);
       this.leftArm.rotation.z = 0;
@@ -350,7 +476,8 @@ export class Player {
       this.rightArm.rotation.z = 0;
       this.leftLeg.rotation.x = THREE.MathUtils.lerp(this.leftLeg.rotation.x, 0, 0.1);
       this.rightLeg.rotation.x = THREE.MathUtils.lerp(this.rightLeg.rotation.x, 0, 0.1);
-      this.headGroup.position.y = 1.45 + idleBob;
+      this.headGroup.position.y = 1.48 + idleBob;
     }
   }
 }
+
