@@ -35,12 +35,12 @@ export class InteractionManager {
     if (currentWorld === 'GARDEN') {
       // 1. Check Cave Portal Trigger
       const distToCave = portalToValley.position.distanceTo(playerPos);
-      if (distToCave < 3.8) {
+      if (distToCave < 4.2) {
         this.currentPrompt = {
           type: 'PORTAL',
-          title: 'Waterfall Cliff Portal',
-          subtitle: 'Ancient passage to Destination Hub & Mystic Valley',
-          actionText: 'Enter Destination Hub',
+          title: '⚡ ADVENTURE MODE PORTAL ⚡',
+          subtitle: 'Gateway to Mystic Valley Adventure Mode & Quests',
+          actionText: 'Enter Adventure Mode',
           targetId: 'portal_valley',
           position: portalToValley.position
         };

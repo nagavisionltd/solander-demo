@@ -7,17 +7,36 @@ export interface SolanderEggMesh {
   name: string;
 }
 
+export interface PalmFruit {
+  id: string;
+  mesh: THREE.Group;
+  initialLocalPos: THREE.Vector3;
+  worldPos: THREE.Vector3;
+  velocity: THREE.Vector3;
+  isDropped: boolean;
+  dropInterval: number;
+  dropTimer: number;
+  respawnTimer: number;
+  floorY: number;
+  parentTree: THREE.Group;
+}
+
 export class SolanderGardenWorld {
   public group: THREE.Group;
   public eggs: SolanderEggMesh[] = [];
+  public palmFruits: PalmFruit[] = [];
+  private clouds: THREE.Group[] = [];
   private fireflies!: THREE.Points;
   private airborneSpores!: THREE.Points;
   private mistPuffs: THREE.Mesh[] = [];
   private godRays: THREE.Mesh[] = [];
   public waterMesh!: THREE.Mesh;
+  public smallWaterMesh!: THREE.Mesh;
   private waterfallStream!: THREE.Mesh;
-  public poolCenter: THREE.Vector3 = new THREE.Vector3(0, -0.2, -7.5);
+  public poolCenter: THREE.Vector3 = new THREE.Vector3(0, -0.2, -6.5);
   public poolRadius: number = 13.5;
+  public smallPoolCenter: THREE.Vector3 = new THREE.Vector3(12.5, -0.2, 9.0);
+  public smallPoolRadius: number = 6.2;
 
   constructor() {
     this.group = new THREE.Group();
@@ -26,6 +45,7 @@ export class SolanderGardenWorld {
     this.buildTerrain();
     this.buildWaterFeature();
     this.buildPaths();
+    this.buildClouds();
     this.buildFoliageAndProps();
     this.buildEggs();
     this.buildEtherealAtmosphere();
@@ -131,8 +151,9 @@ export class SolanderGardenWorld {
   }
 
   public isPosInWater(x: number, z: number): boolean {
-    const distToPool = Math.hypot(x - this.poolCenter.x, z - this.poolCenter.z);
-    return distToPool < this.poolRadius - 0.5;
+    const distToPool1 = Math.hypot(x - this.poolCenter.x, z - this.poolCenter.z);
+    const distToPool2 = Math.hypot(x - this.smallPoolCenter.x, z - this.smallPoolCenter.z);
+    return (distToPool1 < this.poolRadius - 0.4) || (distToPool2 < this.smallPoolRadius - 0.4);
   }
 
   public getGroundHeight(x: number, z: number): number {
@@ -153,10 +174,16 @@ export class SolanderGardenWorld {
       return 4.8;
     }
 
-    // Central Waterfall Swimming Pool (Center: x: 0, z: -7.5)
+    // Central Waterfall Swimming Lake (Expanded Center)
     const distToPool = Math.hypot(x - this.poolCenter.x, z - this.poolCenter.z);
     if (distToPool < this.poolRadius) {
-      return -0.9 - (this.poolRadius - distToPool) * 0.1; // Underwater bed!
+      return -0.9 - (this.poolRadius - distToPool) * 0.08; // Deep underwater lake bed!
+    }
+
+    // East Garden Tranquil Lotus Pool
+    const distToSmallPool = Math.hypot(x - this.smallPoolCenter.x, z - this.smallPoolCenter.z);
+    if (distToSmallPool < this.smallPoolRadius) {
+      return -0.7 - (this.smallPoolRadius - distToSmallPool) * 0.08; // Small pool bed!
     }
 
     // Waterfall Cliff behind pool (z < -13.5)
@@ -189,28 +216,89 @@ export class SolanderGardenWorld {
   }
 
   private buildWaterFeature() {
-    // 1. Central Large Swimming Pool (Radius ~ 6.8m)
+    // 1. Central Massive Swimming Lake
     const poolWaterGeo = new THREE.CylinderGeometry(this.poolRadius, this.poolRadius, 0.15, 36);
     const poolWaterMat = new THREE.MeshStandardMaterial({
       color: 0x0284c7,
       emissive: 0x0369a1,
-      emissiveIntensity: 0.3,
+      emissiveIntensity: 0.35,
       roughness: 0.05,
       metalness: 0.1,
       transparent: true,
-      opacity: 0.82
+      opacity: 0.85
     });
     this.waterMesh = new THREE.Mesh(poolWaterGeo, poolWaterMat);
     this.waterMesh.position.copy(this.poolCenter);
     this.group.add(this.waterMesh);
 
-    // Pool Sand Shore Line Ring
-    const shoreGeo = new THREE.RingGeometry(this.poolRadius - 0.2, this.poolRadius + 1.2, 36);
+    // Lake Sand Shore Line Ring
+    const shoreGeo = new THREE.RingGeometry(this.poolRadius - 0.2, this.poolRadius + 1.4, 36);
     const shoreMat = new THREE.MeshToonMaterial({ color: 0xfef08a, side: THREE.DoubleSide });
     const shore = new THREE.Mesh(shoreGeo, shoreMat);
     shore.rotation.x = Math.PI / 2;
     shore.position.set(this.poolCenter.x, 0.02, this.poolCenter.z);
     this.group.add(shore);
+
+    // 2. East Garden Tranquil Lotus Pool
+    const smallWaterGeo = new THREE.CylinderGeometry(this.smallPoolRadius, this.smallPoolRadius, 0.15, 28);
+    const smallWaterMat = new THREE.MeshStandardMaterial({
+      color: 0x0ea5e9,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.3,
+      roughness: 0.08,
+      transparent: true,
+      opacity: 0.82
+    });
+    this.smallWaterMesh = new THREE.Mesh(smallWaterGeo, smallWaterMat);
+    this.smallWaterMesh.position.copy(this.smallPoolCenter);
+    this.group.add(this.smallWaterMesh);
+
+    // Small Pool Sand Shore Ring
+    const smallShoreGeo = new THREE.RingGeometry(this.smallPoolRadius - 0.2, this.smallPoolRadius + 1.2, 28);
+    const smallShore = new THREE.Mesh(smallShoreGeo, shoreMat);
+    smallShore.rotation.x = Math.PI / 2;
+    smallShore.position.set(this.smallPoolCenter.x, 0.02, this.smallPoolCenter.z);
+    this.group.add(smallShore);
+
+    // Floating Lotus Lily Pads & Flowers on Both Pools
+    const padGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.04, 12);
+    const padMat = new THREE.MeshToonMaterial({ color: 0x15803d });
+    const flowerGeo = new THREE.DodecahedronGeometry(0.18, 1);
+    const flowerMat = new THREE.MeshToonMaterial({ color: 0xf472b6 });
+
+    // Lily pads on main lake
+    for (let l = 0; l < 8; l++) {
+      const angle = (l / 8) * Math.PI * 2;
+      const r = 3.5 + Math.random() * 6.5;
+      const pad = new THREE.Mesh(padGeo, padMat);
+      pad.position.set(
+        this.poolCenter.x + Math.cos(angle) * r,
+        0.08,
+        this.poolCenter.z + Math.sin(angle) * r
+      );
+      if (l % 2 === 0) {
+        const flower = new THREE.Mesh(flowerGeo, flowerMat);
+        flower.position.set(0, 0.12, 0);
+        pad.add(flower);
+      }
+      this.group.add(pad);
+    }
+
+    // Lily pads on small lotus pool
+    for (let l = 0; l < 5; l++) {
+      const angle = (l / 5) * Math.PI * 2;
+      const r = 1.2 + Math.random() * 3.0;
+      const pad = new THREE.Mesh(padGeo, padMat);
+      pad.position.set(
+        this.smallPoolCenter.x + Math.cos(angle) * r,
+        0.08,
+        this.smallPoolCenter.z + Math.sin(angle) * r
+      );
+      const flower = new THREE.Mesh(flowerGeo, flowerMat);
+      flower.position.set(0, 0.12, 0);
+      pad.add(flower);
+      this.group.add(pad);
+    }
 
     // 2. High Rock Cliff Waterfall Centerpiece
     const cliffGroup = new THREE.Group();
@@ -318,31 +406,6 @@ export class SolanderGardenWorld {
     cliffGroup.add(caveGroup);
 
     this.group.add(cliffGroup);
-
-    // Lilypads & Floating Lotus Flowers in Pool
-    const padGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.02, 16);
-    const padMat = new THREE.MeshToonMaterial({ color: 0x15803d });
-    const lotusMat = new THREE.MeshToonMaterial({ color: 0xf43f5e });
-
-    [
-      { x: -5.5, z: -8.2 },
-      { x: 6.2, z: -10.1 },
-      { x: -3.2, z: -4.8 },
-      { x: 5.8, z: -5.5 },
-      { x: -7.0, z: -6.0 },
-      { x: 7.5, z: -8.5 }
-    ].forEach((p, idx) => {
-      const pad = new THREE.Mesh(padGeo, padMat);
-      pad.position.set(p.x, -0.12, p.z);
-
-      if (idx % 2 === 0) {
-        const lotusGeo = new THREE.SphereGeometry(0.2, 8, 8);
-        const lotus = new THREE.Mesh(lotusGeo, lotusMat);
-        lotus.position.set(0, 0.15, 0);
-        pad.add(lotus);
-      }
-      this.group.add(pad);
-    });
 
     // Wooden Swimming Pier / Dock extending into the Lake
     const dockGroup = new THREE.Group();
@@ -469,38 +532,247 @@ export class SolanderGardenWorld {
     this.group.add(hammockGroup);
   }
 
+  private buildClouds() {
+    const cloudMat = new THREE.MeshToonMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.92
+    });
+
+    for (let i = 0; i < 16; i++) {
+      const cloudGroup = new THREE.Group();
+      const puffCount = 5 + Math.floor(Math.random() * 4);
+
+      for (let j = 0; j < puffCount; j++) {
+        const r = 2.2 + Math.random() * 2.5;
+        const puffGeo = new THREE.SphereGeometry(r, 12, 12);
+        const puff = new THREE.Mesh(puffGeo, cloudMat);
+        puff.position.set(
+          (j - puffCount / 2) * 2.4,
+          Math.sin(j * 0.8) * 0.8,
+          (Math.random() - 0.5) * 1.8
+        );
+        cloudGroup.add(puff);
+      }
+
+      const x = (Math.random() - 0.5) * 70;
+      const y = 20 + Math.random() * 12;
+      const z = (Math.random() - 0.5) * 70;
+      cloudGroup.position.set(x, y, z);
+      cloudGroup.scale.setScalar(0.7 + Math.random() * 0.8);
+      cloudGroup.userData = { speed: 1.2 + Math.random() * 1.8 };
+
+      this.group.add(cloudGroup);
+      this.clouds.push(cloudGroup);
+    }
+  }
+
   private buildFoliageAndProps() {
     this.buildGardenToys();
 
-    // Stylized Low-Poly Trees
-    const trunkGeo = new THREE.CylinderGeometry(0.25, 0.35, 2.2, 8);
-    const trunkMat = new THREE.MeshToonMaterial({ color: 0x78350f });
-
-    const foliageGeo = new THREE.SphereGeometry(1.4, 12, 10);
-    const foliageMat = new THREE.MeshToonMaterial({ color: 0x22c55e });
+    // 1. MAJESTIC TALL TREES (Taller trunks & multi-tier lush canopies!)
+    const trunkMat = new THREE.MeshToonMaterial({ color: 0x582f0e });
+    const barkRingGeo = new THREE.CylinderGeometry(0.55, 0.75, 6.5, 10);
+    const foliageColors = [0x15803d, 0x16a34a, 0x22c55e, 0x4ade80];
 
     const treePositions = [
-      { x: -8, z: -6 }, { x: -12, z: 4 }, { x: 10, z: 8 },
-      { x: 12, z: -8 }, { x: -6, z: 12 }, { x: 8, z: -14 },
-      { x: -14, z: -12 }
+      { x: -10, z: -8, height: 6.8 },
+      { x: -15, z: 2, height: 7.2 },
+      { x: 12, z: 10, height: 6.5 },
+      { x: 14, z: -10, height: 7.5 },
+      { x: -8, z: 15, height: 6.2 },
+      { x: 10, z: -16, height: 7.0 },
+      { x: -16, z: -14, height: 7.8 },
+      { x: 16, z: 4, height: 6.6 },
+      { x: -4, z: 18, height: 6.0 },
+      { x: 18, z: -4, height: 7.4 }
     ];
 
-    treePositions.forEach(p => {
+    treePositions.forEach((p, tIdx) => {
       const tree = new THREE.Group();
       const h = this.getGroundHeight(p.x, p.z);
 
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-      trunk.position.y = 1.1;
+      // Trunk
+      const trunk = new THREE.Mesh(barkRingGeo, trunkMat);
+      trunk.position.y = p.height * 0.5;
+      trunk.scale.set(1, p.height / 6.5, 1);
       trunk.castShadow = true;
+      tree.add(trunk);
 
-      const foliage = new THREE.Mesh(foliageGeo, foliageMat);
-      foliage.position.y = 2.4;
-      foliage.castShadow = true;
+      // 3 Multi-stage layered foliage caps
+      const stages = [
+        { y: p.height - 0.2, scale: 2.8, color: foliageColors[tIdx % 4] },
+        { y: p.height + 1.8, scale: 2.2, color: foliageColors[(tIdx + 1) % 4] },
+        { y: p.height + 3.4, scale: 1.5, color: foliageColors[(tIdx + 2) % 4] }
+      ];
 
-      tree.add(trunk, foliage);
+      stages.forEach(s => {
+        const fGeo = new THREE.DodecahedronGeometry(s.scale, 1);
+        const fMat = new THREE.MeshToonMaterial({ color: s.color });
+        const foliage = new THREE.Mesh(fGeo, fMat);
+        foliage.position.y = s.y;
+        foliage.castShadow = true;
+        tree.add(foliage);
+      });
+
       tree.position.set(p.x, h, p.z);
       this.group.add(tree);
     });
+
+    // 2. TROPICAL PALM TREES WITH DROPPING & REGENERATING FRUIT!
+    const palmPositions = [
+      { x: -8.5, z: -4.5 },
+      { x: 8.5, z: -5.0 },
+      { x: -9.0, z: -11.0 },
+      { x: 9.5, z: -11.5 }
+    ];
+
+    const palmTrunkMat = new THREE.MeshToonMaterial({ color: 0x78350f });
+    const palmLeafMat = new THREE.MeshToonMaterial({ color: 0x16a34a, side: THREE.DoubleSide });
+    const coconutMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.8 });
+    const starFruitMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3, emissive: 0xca8a04, emissiveIntensity: 0.2 });
+
+    palmPositions.forEach((p, pIdx) => {
+      const palmGroup = new THREE.Group();
+      const baseH = this.getGroundHeight(p.x, p.z);
+
+      // Curved segmented trunk
+      const trunkSegCount = 7;
+      let currY = 0;
+      for (let s = 0; s < trunkSegCount; s++) {
+        const segGeo = new THREE.CylinderGeometry(0.35 - s * 0.02, 0.42 - s * 0.02, 1.0, 8);
+        const seg = new THREE.Mesh(segGeo, palmTrunkMat);
+        seg.position.set(Math.sin(s * 0.2) * 0.25, currY + 0.5, 0);
+        seg.rotation.z = -s * 0.04;
+        seg.castShadow = true;
+        palmGroup.add(seg);
+        currY += 0.92;
+      }
+
+      // Crown Palm Fronds (6 arching leaves)
+      const frondGeo = new THREE.PlaneGeometry(0.8, 3.8, 4, 8);
+      for (let f = 0; f < 7; f++) {
+        const frond = new THREE.Mesh(frondGeo, palmLeafMat);
+        const angle = (f / 7) * Math.PI * 2;
+        frond.rotation.set(-0.6, angle, 0, 'YXZ');
+        frond.position.set(Math.cos(angle) * 0.4, currY, Math.sin(angle) * 0.4);
+        frond.castShadow = true;
+        palmGroup.add(frond);
+      }
+
+      palmGroup.position.set(p.x, baseH, p.z);
+      this.group.add(palmGroup);
+
+      // 3-4 Fruits hanging underneath the palm leaves
+      const fruitCount = 3 + (pIdx % 2);
+      for (let fr = 0; fr < fruitCount; fr++) {
+        const fruitGroup = new THREE.Group();
+        const isCoconut = fr % 2 === 0;
+
+        if (isCoconut) {
+          const cocoGeo = new THREE.SphereGeometry(0.28, 12, 12);
+          const coco = new THREE.Mesh(cocoGeo, coconutMat);
+          coco.castShadow = true;
+          fruitGroup.add(coco);
+        } else {
+          const starGeo = new THREE.OctahedronGeometry(0.32, 1);
+          const star = new THREE.Mesh(starGeo, starFruitMat);
+          star.castShadow = true;
+          fruitGroup.add(star);
+        }
+
+        const angle = (fr / fruitCount) * Math.PI * 2;
+        const localPos = new THREE.Vector3(
+          Math.cos(angle) * 0.65,
+          currY - 0.2,
+          Math.sin(angle) * 0.65
+        );
+        fruitGroup.position.copy(localPos);
+        palmGroup.add(fruitGroup);
+
+        const worldPos = localPos.clone().add(palmGroup.position);
+
+        this.palmFruits.push({
+          id: `fruit_${pIdx}_${fr}`,
+          mesh: fruitGroup,
+          initialLocalPos: localPos.clone(),
+          worldPos: worldPos.clone(),
+          velocity: new THREE.Vector3(),
+          isDropped: false,
+          dropInterval: 8.0 + Math.random() * 16.0,
+          dropTimer: Math.random() * 6.0,
+          respawnTimer: 0,
+          floorY: this.getGroundHeight(worldPos.x, worldPos.z) + 0.25,
+          parentTree: palmGroup
+        });
+      }
+    });
+
+    // 3. ANCIENT NATURAL STRUCTURES & PLANTS
+    // A. Ruined Ancient Mossy Stone Archway
+    const archGroup = new THREE.Group();
+    const pillarMat = new THREE.MeshToonMaterial({ color: 0x475569 });
+    const mossCapMat = new THREE.MeshToonMaterial({ color: 0x22c55e });
+
+    const leftPillarGeo = new THREE.BoxGeometry(0.9, 3.8, 0.9);
+    const lPillar = new THREE.Mesh(leftPillarGeo, pillarMat);
+    lPillar.position.set(-1.8, 1.9, 0);
+
+    const rPillar = new THREE.Mesh(leftPillarGeo, pillarMat);
+    rPillar.position.set(1.8, 1.9, 0);
+
+    const lintelGeo = new THREE.BoxGeometry(4.8, 0.8, 1.1);
+    const lintel = new THREE.Mesh(lintelGeo, pillarMat);
+    lintel.position.set(0, 3.8, 0);
+
+    const mossTopGeo = new THREE.BoxGeometry(5.0, 0.2, 1.3);
+    const mossTop = new THREE.Mesh(mossTopGeo, mossCapMat);
+    mossTop.position.set(0, 4.3, 0);
+
+    archGroup.add(lPillar, rPillar, lintel, mossTop);
+    const archH = this.getGroundHeight(-3, 3);
+    archGroup.position.set(-3, archH, 3);
+    archGroup.rotation.y = 0.35;
+    this.group.add(archGroup);
+
+    // B. Bioluminescent Giant Mushrooms
+    const shroomGeo = new THREE.SphereGeometry(0.8, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55);
+    const shroomMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x0284c7, emissiveIntensity: 0.8 });
+    const stemGeo = new THREE.CylinderGeometry(0.18, 0.28, 1.6, 8);
+    const stemMat = new THREE.MeshToonMaterial({ color: 0xf8fafc });
+
+    [
+      { x: -11, z: 6, s: 1.2 },
+      { x: -10, z: 7.2, s: 0.8 },
+      { x: 11, z: -4, s: 1.4 },
+      { x: 12.2, z: -3.2, s: 0.9 }
+    ].forEach(sh => {
+      const shroomGroup = new THREE.Group();
+      const stem = new THREE.Mesh(stemGeo, stemMat);
+      stem.position.y = 0.8;
+      const cap = new THREE.Mesh(shroomGeo, shroomMat);
+      cap.position.y = 1.5;
+      shroomGroup.add(stem, cap);
+
+      const h = this.getGroundHeight(sh.x, sh.z);
+      shroomGroup.position.set(sh.x, h, sh.z);
+      shroomGroup.scale.setScalar(sh.s);
+      this.group.add(shroomGroup);
+    });
+
+    // C. Bamboo Grove
+    const bambooStemGeo = new THREE.CylinderGeometry(0.12, 0.15, 5.5, 8);
+    const bambooMat = new THREE.MeshToonMaterial({ color: 0x16a34a });
+    for (let b = 0; b < 10; b++) {
+      const bx = -13 + (b % 4) * 0.9 + Math.random() * 0.4;
+      const bz = -10 + Math.floor(b / 4) * 1.1 + Math.random() * 0.4;
+      const bh = this.getGroundHeight(bx, bz);
+
+      const bamboo = new THREE.Mesh(bambooStemGeo, bambooMat);
+      bamboo.position.set(bx, bh + 2.75, bz);
+      bamboo.castShadow = true;
+      this.group.add(bamboo);
+    }
 
     // Mossy Rocks
     const rockGeo = new THREE.DodecahedronGeometry(0.8, 1);
@@ -508,7 +780,8 @@ export class SolanderGardenWorld {
     [
       { x: -4, z: -3, s: 0.9 },
       { x: 8, z: 2, s: 1.2 },
-      { x: -2, z: 8, s: 0.7 }
+      { x: -2, z: 8, s: 0.7 },
+      { x: -12, z: -6, s: 1.5 }
     ].forEach(r => {
       const rock = new THREE.Mesh(rockGeo, rockMat);
       const h = this.getGroundHeight(r.x, r.z);
@@ -519,19 +792,19 @@ export class SolanderGardenWorld {
       this.group.add(rock);
     });
 
-    // Colorful Flowers
-    const flowerGeo = new THREE.SphereGeometry(0.12, 8, 8);
-    const flowerColors = [0xf43f5e, 0xfacc15, 0xa855f7, 0x38bdf8];
+    // Colorful Flowers & Fern Bush Patches
+    const flowerGeo = new THREE.SphereGeometry(0.14, 8, 8);
+    const flowerColors = [0xf43f5e, 0xfacc15, 0xa855f7, 0x38bdf8, 0xf472b6];
 
-    for (let i = 0; i < 30; i++) {
-      const x = (Math.random() - 0.5) * 25;
-      const z = (Math.random() - 0.5) * 25;
+    for (let i = 0; i < 45; i++) {
+      const x = (Math.random() - 0.5) * 32;
+      const z = (Math.random() - 0.5) * 32;
       const h = this.getGroundHeight(x, z);
 
       const color = flowerColors[i % flowerColors.length];
       const mat = new THREE.MeshToonMaterial({ color });
       const flower = new THREE.Mesh(flowerGeo, mat);
-      flower.position.set(x, h + 0.12, z);
+      flower.position.set(x, h + 0.14, z);
       this.group.add(flower);
     }
   }
@@ -584,7 +857,96 @@ export class SolanderGardenWorld {
     });
   }
 
-  public update(time: number) {
+  public update(time: number, deltaTime: number = 0.016, playerPos?: THREE.Vector3) {
+    // 1. Animate drifting clouds
+    this.clouds.forEach(cloud => {
+      const speed = cloud.userData.speed as number;
+      cloud.position.x += speed * deltaTime;
+      if (cloud.position.x > 38) {
+        cloud.position.x = -38;
+      }
+    });
+
+    // 2. Animate Palm Fruits Dropping, Physics Bouncing & Regeneration
+    this.palmFruits.forEach(fruit => {
+      if (!fruit.isDropped) {
+        fruit.dropTimer += deltaTime;
+        // Keep fruit attached to tree canopy
+        fruit.mesh.position.copy(fruit.initialLocalPos);
+
+        // Smooth regeneration pop scale animation
+        if (fruit.mesh.scale.x < 1.0) {
+          const newS = Math.min(1.0, fruit.mesh.scale.x + deltaTime * 1.5);
+          fruit.mesh.scale.setScalar(newS);
+        }
+
+        if (fruit.dropTimer >= fruit.dropInterval) {
+          // DETACH FRUIT!
+          fruit.isDropped = true;
+          fruit.dropTimer = 0;
+          fruit.respawnTimer = 0;
+
+          // Convert local tree position to world coordinates
+          const worldPos = fruit.initialLocalPos.clone().add(fruit.parentTree.position);
+          fruit.worldPos.copy(worldPos);
+
+          // Detach mesh to main world group for free falling
+          this.group.add(fruit.mesh);
+          fruit.mesh.position.copy(fruit.worldPos);
+
+          // Initial drop velocity push
+          fruit.velocity.set(
+            (Math.random() - 0.5) * 2.2,
+            1.2,
+            (Math.random() - 0.5) * 2.2
+          );
+          fruit.floorY = this.getGroundHeight(worldPos.x, worldPos.z) + 0.28;
+        }
+      } else {
+        // Fruit in dropped state - apply gravity and physics
+        fruit.velocity.y -= 16.0 * deltaTime;
+        fruit.worldPos.x += fruit.velocity.x * deltaTime;
+        fruit.worldPos.y += fruit.velocity.y * deltaTime;
+        fruit.worldPos.z += fruit.velocity.z * deltaTime;
+
+        // Ground collision & bouncing
+        fruit.floorY = this.getGroundHeight(fruit.worldPos.x, fruit.worldPos.z) + 0.28;
+        if (fruit.worldPos.y <= fruit.floorY) {
+          fruit.worldPos.y = fruit.floorY;
+          if (Math.abs(fruit.velocity.y) > 0.8) {
+            fruit.velocity.y = -fruit.velocity.y * 0.38; // Soft bounce
+            fruit.velocity.x *= 0.6;
+            fruit.velocity.z *= 0.6;
+          } else {
+            fruit.velocity.y = 0;
+            fruit.velocity.x *= 0.88;
+            fruit.velocity.z *= 0.88;
+          }
+        }
+
+        fruit.mesh.position.copy(fruit.worldPos);
+        fruit.mesh.rotation.x += fruit.velocity.z * deltaTime * 2.0;
+        fruit.mesh.rotation.z -= fruit.velocity.x * deltaTime * 2.0;
+
+        // Collection / Regeneration timer
+        fruit.respawnTimer += deltaTime;
+        const distToPlayer = playerPos ? fruit.worldPos.distanceTo(playerPos) : 999;
+
+        if (distToPlayer < 2.2 || fruit.respawnTimer > 20.0) {
+          // Collect / re-attach fruit to parent tree to regenerate!
+          fruit.isDropped = false;
+          fruit.dropTimer = 0;
+          fruit.respawnTimer = 0;
+          fruit.dropInterval = 10.0 + Math.random() * 18.0;
+
+          fruit.parentTree.add(fruit.mesh);
+          fruit.mesh.position.copy(fruit.initialLocalPos);
+          fruit.mesh.rotation.set(0, 0, 0);
+          fruit.mesh.scale.set(0.01, 0.01, 0.01); // Shrink for scale-in regen
+        }
+      }
+    });
+
     // Animate waterfall stream texture / scale pulse
     if (this.waterfallStream) {
       this.waterfallStream.scale.x = 1.0 + Math.sin(time * 8) * 0.05;

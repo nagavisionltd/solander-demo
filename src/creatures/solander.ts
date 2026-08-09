@@ -287,7 +287,7 @@ export class SolanderCreature {
 
     if (this.isSleeping) {
       const groundY = getGroundHeight(this.position.x, this.position.z);
-      this.position.y = groundY + 0.25;
+      this.position.y = groundY + 0.42;
       this.mesh.position.copy(this.position);
       this.mesh.rotation.z = 0.4; // Curled up on side sleeping
       return;
@@ -312,12 +312,12 @@ export class SolanderCreature {
         this.isHappyJump = false;
         this.heartParticles.children.forEach(p => p.visible = false);
       }
-      this.position.y = groundY + 0.45 + hopY;
+      this.position.y = groundY + 0.48 + hopY;
     } else if (this.velocity.lengthSq() > 0.05) {
       hopY = Math.abs(Math.sin(time * 8)) * 0.15;
-      this.position.y = groundY + 0.45 + hopY;
+      this.position.y = groundY + 0.48 + hopY;
     } else {
-      this.position.y = groundY + 0.45;
+      this.position.y = groundY + 0.48;
     }
 
     this.mesh.position.copy(this.position);

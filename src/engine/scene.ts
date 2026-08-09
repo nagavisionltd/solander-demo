@@ -331,7 +331,7 @@ export class GameSceneManager {
           this.dirLight.color.setHex(0xc084fc);
 
           // Spawn player in Mystic Valley near entrance
-          this.player.position.set(0, this.mysticValleyWorld.getGroundHeight(0, -15), -15);
+          this.player.position.set(0, this.mysticValleyWorld.getGroundHeight(0, -15) + 0.43, -15);
           this.player.mesh.position.copy(this.player.position);
 
           // Move Lumi to Mystic Valley scene
@@ -351,7 +351,7 @@ export class GameSceneManager {
           this.ambientLight.intensity = 0.7;
           this.dirLight.color.setHex(0xffffff);
 
-          this.player.position.set(0, this.gardenWorld.getGroundHeight(0, -15), -15);
+          this.player.position.set(0, this.gardenWorld.getGroundHeight(0, -15) + 0.43, -15);
           this.player.mesh.position.copy(this.player.position);
 
           if (this.companionCreature) {
@@ -387,7 +387,6 @@ export class GameSceneManager {
     const lookDelta = inputManager.consumeLookDelta();
     this.cameraSystem.rotate(lookDelta.x, lookDelta.y);
 
-    const doJump = inputManager.consumeJump();
     const doInteract = inputManager.consumeInteract();
 
     if (doInteract) {
@@ -499,7 +498,7 @@ export class GameSceneManager {
 
     // Worlds Animations
     if (this.currentWorld === 'GARDEN') {
-      this.gardenWorld.update(elapsedTime);
+      this.gardenWorld.update(elapsedTime, deltaTime, this.player.position);
       this.portalToValley.update(elapsedTime);
     } else {
       this.mysticValleyWorld.update(elapsedTime);

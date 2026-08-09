@@ -31,7 +31,12 @@ export class InputManager {
     window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
       if (e.code === 'KeyE') this.isInteractPressed = true;
-      if (e.code === 'Space') this.isJumpPressed = true;
+      if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
+        this.isJumpPressed = true;
+        if (e.target === document.body || (e.target as HTMLElement)?.tagName !== 'INPUT') {
+          e.preventDefault();
+        }
+      }
       if (e.code === 'KeyJ' || e.code === 'KeyF') this.isMeleePressed = true;
       if (e.code === 'KeyK' || e.code === 'KeyL') this.isLaserPressed = true;
       if (e.code === 'KeyC' || e.code === 'KeyR') this.isRollPressed = true;
@@ -41,7 +46,7 @@ export class InputManager {
     window.addEventListener('keyup', (e) => {
       this.keys[e.code] = false;
       if (e.code === 'KeyE') this.isInteractPressed = false;
-      if (e.code === 'Space') this.isJumpPressed = false;
+      if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') this.isJumpPressed = false;
       if (e.code === 'KeyJ' || e.code === 'KeyF') this.isMeleePressed = false;
       if (e.code === 'KeyK' || e.code === 'KeyL') this.isLaserPressed = false;
       if (e.code === 'KeyC' || e.code === 'KeyR') this.isRollPressed = false;
