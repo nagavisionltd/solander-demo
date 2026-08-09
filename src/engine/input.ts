@@ -10,7 +10,10 @@ export class InputManager {
   public lookDelta: { x: number; y: number } = { x: 0, y: 0 };
   public isInteractPressed: boolean = false;
   public isJumpPressed: boolean = false;
-  public isAttackPressed: boolean = false;
+  public isMeleePressed: boolean = false;
+  public isLaserPressed: boolean = false;
+  public isRollPressed: boolean = false;
+  public isSprintHeld: boolean = false;
   public isCarryPressed: boolean = false;
   public isMouseDown: boolean = false;
 
@@ -29,30 +32,47 @@ export class InputManager {
       this.keys[e.code] = true;
       if (e.code === 'KeyE') this.isInteractPressed = true;
       if (e.code === 'Space') this.isJumpPressed = true;
-      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyJ' || e.code === 'KeyF') {
-        this.isAttackPressed = true;
-      }
-      if (e.code === 'KeyC') this.isCarryPressed = true;
+      if (e.code === 'KeyJ' || e.code === 'KeyF') this.isMeleePressed = true;
+      if (e.code === 'KeyK' || e.code === 'KeyL') this.isLaserPressed = true;
+      if (e.code === 'KeyC' || e.code === 'KeyR') this.isRollPressed = true;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.isSprintHeld = true;
     });
 
     window.addEventListener('keyup', (e) => {
       this.keys[e.code] = false;
       if (e.code === 'KeyE') this.isInteractPressed = false;
       if (e.code === 'Space') this.isJumpPressed = false;
-      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyJ' || e.code === 'KeyF') {
-        this.isAttackPressed = false;
-      }
-      if (e.code === 'KeyC') this.isCarryPressed = false;
+      if (e.code === 'KeyJ' || e.code === 'KeyF') this.isMeleePressed = false;
+      if (e.code === 'KeyK' || e.code === 'KeyL') this.isLaserPressed = false;
+      if (e.code === 'KeyC' || e.code === 'KeyR') this.isRollPressed = false;
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.isSprintHeld = false;
     });
 
     window.addEventListener('mousedown', (e) => {
       // Ignore if clicking UI elements
       if ((e.target as HTMLElement)?.closest('.no-game-input')) return;
-      this.isMouseDown = true;
+      if (e.button === 0) {
+        this.isMeleePressed = true;
+        this.isMouseDown = true;
+      } else if (e.button === 2) {
+        this.isLaserPressed = true;
+      }
     });
 
-    window.addEventListener('mouseup', () => {
-      this.isMouseDown = false;
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) {
+        this.isMouseDown = false;
+        this.isMeleePressed = false;
+      } else if (e.button === 2) {
+        this.isLaserPressed = false;
+      }
+    });
+
+    window.addEventListener('contextmenu', (e) => {
+      // Prevent default right click menu in game view
+      if (!(e.target as HTMLElement)?.closest('.no-game-input')) {
+        e.preventDefault();
+      }
     });
 
     window.addEventListener('mousemove', (e) => {
@@ -95,11 +115,12 @@ export class InputManager {
             this.lookDelta.y += ry * 12;
           }
 
-          // Buttons: 0=A (Jump), 1=B (Interact), 2=X (Attack), 3=Y (Carry)
+          // Buttons: 0=A (Jump), 1=B (Roll), 2=X (Melee), 3=Y (Laser), 5=R1 (Sprint)
           if (gp.buttons[0]?.pressed) this.isJumpPressed = true;
-          if (gp.buttons[1]?.pressed) this.isInteractPressed = true;
-          if (gp.buttons[2]?.pressed) this.isAttackPressed = true;
-          if (gp.buttons[3]?.pressed) this.isCarryPressed = true;
+          if (gp.buttons[1]?.pressed) this.isRollPressed = true;
+          if (gp.buttons[2]?.pressed) this.isMeleePressed = true;
+          if (gp.buttons[3]?.pressed) this.isLaserPressed = true;
+          if (gp.buttons[5]?.pressed) this.isSprintHeld = true;
         }
       }
     }
@@ -143,9 +164,21 @@ export class InputManager {
     return pressed;
   }
 
-  public consumeAttack(): boolean {
-    const pressed = this.isAttackPressed;
-    this.isAttackPressed = false;
+  public consumeMelee(): boolean {
+    const pressed = this.isMeleePressed;
+    this.isMeleePressed = false;
+    return pressed;
+  }
+
+  public consumeLaser(): boolean {
+    const pressed = this.isLaserPressed;
+    this.isLaserPressed = false;
+    return pressed;
+  }
+
+  public consumeRoll(): boolean {
+    const pressed = this.isRollPressed;
+    this.isRollPressed = false;
     return pressed;
   }
 

@@ -4,11 +4,13 @@ export class ThirdPersonCamera {
   public camera: THREE.PerspectiveCamera;
   public yaw: number = 0; // Horizontal rotation angle in radians
   public pitch: number = 0.35; // Vertical rotation angle in radians
-  public distance: number = 7.5;
+  public baseDistance: number = 7.2;
+  public distance: number = 7.2;
   public heightOffset: number = 1.6;
 
   private targetPosition: THREE.Vector3 = new THREE.Vector3();
   private currentPosition: THREE.Vector3 = new THREE.Vector3();
+  private baseFOV: number = 55;
 
   constructor() {
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 500);
@@ -26,9 +28,20 @@ export class ThirdPersonCamera {
     this.pitch = Math.max(0.1, Math.min(1.2, this.pitch + deltaY * sensitivity));
   }
 
-  public update(playerPos: THREE.Vector3, deltaTime: number) {
+  public update(playerPos: THREE.Vector3, deltaTime: number, currentSpeed: number = 0) {
     // Target position (player center height)
     this.targetPosition.copy(playerPos).add(new THREE.Vector3(0, this.heightOffset, 0));
+
+    // Dynamic camera distance and FOV based on speed
+    const speedRatio = Math.min(1, currentSpeed / 18.0);
+    const targetDistance = this.baseDistance + speedRatio * 2.2;
+    this.distance = THREE.MathUtils.lerp(this.distance, targetDistance, deltaTime * 4.0);
+
+    const targetFOV = this.baseFOV + speedRatio * 18.0; // 55° up to 73° at high speed!
+    if (Math.abs(this.camera.fov - targetFOV) > 0.1) {
+      this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFOV, deltaTime * 5.0);
+      this.camera.updateProjectionMatrix();
+    }
 
     // Calculate desired camera position based on spherical coordinates from yaw & pitch
     const dx = Math.sin(this.yaw) * Math.cos(this.pitch) * this.distance;
@@ -42,7 +55,7 @@ export class ThirdPersonCamera {
     );
 
     // Smooth camera lerp
-    const lerpSpeed = Math.min(1, deltaTime * 8);
+    const lerpSpeed = Math.min(1, deltaTime * 9);
     this.currentPosition.lerp(desiredPosition, lerpSpeed);
 
     this.camera.position.copy(this.currentPosition);

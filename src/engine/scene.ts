@@ -11,11 +11,29 @@ import { InteractionManager, ActivePrompt } from '../systems/interaction';
 import { saveSystem, SolanderCreatureData } from '../systems/save';
 import { sound } from '../systems/audio';
 
+export interface CombatInfo {
+  inCombat: boolean;
+  comboCount: number;
+  enemyName: string | null;
+  enemyHp: number;
+  enemyMaxHp: number;
+}
+
 export class GameSceneManager {
   public renderer: THREE.WebGLRenderer;
   public scene: THREE.Scene;
   public cameraSystem: ThirdPersonCamera;
   public player: Player;
+
+  public combatTimer: number = 0;
+  public activeCombatInfo: CombatInfo = {
+    inCombat: false,
+    comboCount: 0,
+    enemyName: null,
+    enemyHp: 3,
+    enemyMaxHp: 3
+  };
+  private onCombatStateChange?: (info: CombatInfo) => void;
 
   public gardenWorld: SolanderGardenWorld;
   public mysticValleyWorld: MysticValleyWorld;
@@ -41,34 +59,42 @@ export class GameSceneManager {
   constructor(
     container: HTMLElement,
     onPromptChange: (prompt: ActivePrompt | null) => void,
-    onFadeUpdate: (opacity: number) => void
+    onFadeUpdate: (opacity: number) => void,
+    onCombatStateChange?: (info: CombatInfo) => void
   ) {
     this.onPromptChange = onPromptChange;
     this.onFadeUpdate = onFadeUpdate;
+    this.onCombatStateChange = onCombatStateChange;
     this.clock = new THREE.Clock();
 
     // Three.js Scene & Renderer Setup
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87ceeb); // Sky blue
-    this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.02);
+    const skyColor = new THREE.Color(0xcfe8ff); // Sky: Children of the Light pastel blue
+    this.scene.background = skyColor;
+    this.scene.fog = new THREE.FogExp2(0xcfe8ff, 0.015);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.1;
     container.appendChild(this.renderer.domElement);
 
     // Camera
     this.cameraSystem = new ThirdPersonCamera();
     this.cameraSystem.updateAspectRatio(container.clientWidth / container.clientHeight);
 
-    // Lighting
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    // Lighting (Warm golden sunshine + Sky bounce)
+    this.ambientLight = new THREE.AmbientLight(0xe0f2fe, 0.75);
     this.scene.add(this.ambientLight);
 
-    this.dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    this.dirLight.position.set(12, 20, 15);
+    const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0xd97706, 0.45);
+    this.scene.add(hemiLight);
+
+    this.dirLight = new THREE.DirectionalLight(0xfffae0, 1.35);
+    this.dirLight.position.set(12, 22, 15);
     this.dirLight.castShadow = true;
     this.dirLight.shadow.mapSize.width = 1024;
     this.dirLight.shadow.mapSize.height = 1024;
@@ -94,7 +120,7 @@ export class GameSceneManager {
     this.scene.add(this.mysticValleyWorld.group);
 
     // Portals
-    const cavePos1 = new THREE.Vector3(0, this.gardenWorld.getGroundHeight(0, -18), -18);
+    const cavePos1 = new THREE.Vector3(-4.5, this.gardenWorld.getGroundHeight(-4.5, -14.2), -14.2);
     this.portalToValley = new PortalCave(cavePos1, 'MYSTIC_VALLEY');
     this.gardenWorld.group.add(this.portalToValley.mesh);
 
@@ -157,23 +183,21 @@ export class GameSceneManager {
     }
   };
 
-  public handlePlayerAttack() {
-    if (this.player.isAttacking) return;
-    this.player.isAttacking = true;
-    sound.playSpinAttackSound();
+  public handlePlayerMeleeAttack() {
+    const success = this.player.triggerMeleeCombo();
+    if (!success) return;
+    this.combatTimer = 4.0;
 
-    setTimeout(() => {
-      this.player.isAttacking = false;
-    }, 450);
-
-    // In Mystic Valley, check collision with Void Enemies
+    // Check hit detection with Void Enemies in Mystic Valley
     if (this.currentWorld === 'MYSTIC_VALLEY') {
       this.mysticValleyWorld.enemies.forEach(enemy => {
         if (enemy.alive) {
           const dist = this.player.position.distanceTo(enemy.position);
-          if (dist < 2.8) {
+          if (dist < 3.2) {
             enemy.hp -= 1;
             sound.playChirp();
+            this.player.laserGun.createImpact(enemy.position.clone().add(new THREE.Vector3(0, 0.6, 0)));
+
             if (enemy.eyeMesh.material instanceof THREE.MeshStandardMaterial) {
               enemy.eyeMesh.material.emissive.setHex(0xffffff);
               setTimeout(() => {
@@ -187,13 +211,19 @@ export class GameSceneManager {
               enemy.alive = false;
               enemy.mesh.visible = false;
               sound.playEnemyDefeat();
-              saveSystem.collectResource('essence', 2);
-              saveSystem.setMessage(`💥 Defeated Void Shade! Gained +2 ✨ Solander Essence!`);
+              saveSystem.collectResource('essence', 3);
+              saveSystem.collectResource('crystals', 1);
+              saveSystem.setMessage(`💥 Defeated Void Shade! Gained +3 ✨ Essence & +1 💎 Crystal!`);
             }
           }
         }
       });
     }
+  }
+
+  public handlePlayerLaserFire() {
+    this.combatTimer = 4.0;
+    this.player.triggerLaserFire(this.cameraSystem, this.scene);
   }
 
   public toggleCarryCompanion() {
@@ -244,14 +274,16 @@ export class GameSceneManager {
     saveSystem.setMessage(`🌟 ${target.data.name} is now your active companion!`);
   }
 
-  public handleInteractAction() {
+  public handleInteractAction(onOpenDestinationHub?: () => void, onInspectChao?: (creatureId: string) => void) {
     if (this.interactionManager.currentPrompt) {
       this.interactionManager.executeInteraction(
         this.interactionManager.currentPrompt,
         this.gardenWorld,
         this.mysticValleyWorld,
         this.creatures,
-        (targetWorld) => this.switchWorld(targetWorld)
+        (targetWorld) => this.switchWorld(targetWorld),
+        onOpenDestinationHub,
+        onInspectChao
       );
 
       // Check if egg hatching added new creature
@@ -362,9 +394,17 @@ export class GameSceneManager {
       this.handleInteractAction();
     }
 
-    // Player Attack / Spin Attack Action
-    if (inputManager.consumeAttack()) {
-      this.handlePlayerAttack();
+    // Player Action Controls
+    if (inputManager.consumeMelee()) {
+      this.handlePlayerMeleeAttack();
+    }
+
+    if (inputManager.consumeLaser()) {
+      this.handlePlayerLaserFire();
+    }
+
+    if (inputManager.consumeRoll()) {
+      this.player.triggerRoll();
     }
 
     // Player Carry Action
@@ -378,8 +418,81 @@ export class GameSceneManager {
       sound.playSplash();
     }
 
-    // Player Movement Update
-    this.player.update(inputVec, this.cameraSystem, deltaTime, this.getGroundHeight, doJump, inWater);
+    // Player Movement Update with SA2 Momentum Engine
+    this.player.update(inputVec, inputManager, this.cameraSystem, deltaTime, this.getGroundHeight, this.scene, inWater);
+
+    // Laser Projectile Hit Detection in Mystic Valley
+    if (this.currentWorld === 'MYSTIC_VALLEY') {
+      const projectiles = this.player.laserGun.projectiles;
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const p = projectiles[i];
+        for (const enemy of this.mysticValleyWorld.enemies) {
+          if (enemy.alive) {
+            const dist = p.position.distanceTo(enemy.position.clone().add(new THREE.Vector3(0, 0.6, 0)));
+            if (dist < 1.6) {
+              this.player.laserGun.createImpact(p.position);
+              this.scene.remove(p.mesh);
+              projectiles.splice(i, 1);
+
+              enemy.hp -= p.damage;
+              sound.playChirp();
+
+              if (enemy.hp <= 0) {
+                enemy.alive = false;
+                enemy.mesh.visible = false;
+                sound.playEnemyDefeat();
+                saveSystem.collectResource('essence', 3);
+                saveSystem.collectResource('crystals', 1);
+                saveSystem.setMessage(`💥 Laser destroyed Void Shade! Gained +3 ✨ Essence & +1 💎 Crystal!`);
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      // Resource Nodes Pickup Check in Mystic Valley
+      this.mysticValleyWorld.resourceNodes.forEach(node => {
+        if (!node.collected) {
+          const dist = this.player.position.distanceTo(node.position);
+          if (dist < 1.8) {
+            node.collected = true;
+            node.mesh.visible = false;
+            sound.playChirp();
+            saveSystem.collectResource(node.type, 1);
+            saveSystem.increaseBond(2);
+            saveSystem.setMessage(`Collected ${node.name}! Companion bond +2%!`);
+          }
+        }
+      });
+    }
+
+    // Combat Timer & Enemy Proximity Check
+    if (this.combatTimer > 0) {
+      this.combatTimer -= deltaTime;
+    }
+
+    let nearbyEnemy: { name: string; hp: number; maxHp: number } | null = null;
+    if (this.currentWorld === 'MYSTIC_VALLEY') {
+      for (const enemy of this.mysticValleyWorld.enemies) {
+        if (enemy.alive && this.player.position.distanceTo(enemy.position) < 8.5) {
+          nearbyEnemy = { name: 'Void Shade', hp: enemy.hp, maxHp: 3 };
+          this.combatTimer = Math.max(this.combatTimer, 2.0);
+          break;
+        }
+      }
+    }
+
+    const inCombat = this.combatTimer > 0 || this.player.isMeleeAttacking;
+    if (this.onCombatStateChange) {
+      this.onCombatStateChange({
+        inCombat,
+        comboCount: this.player.isMeleeAttacking ? this.player.comboStep : 0,
+        enemyName: nearbyEnemy ? nearbyEnemy.name : null,
+        enemyHp: nearbyEnemy ? nearbyEnemy.hp : 0,
+        enemyMaxHp: nearbyEnemy ? nearbyEnemy.maxHp : 3
+      });
+    }
 
     // Camera Follow
     this.cameraSystem.update(this.player.position, deltaTime);

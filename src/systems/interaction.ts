@@ -35,12 +35,12 @@ export class InteractionManager {
     if (currentWorld === 'GARDEN') {
       // 1. Check Cave Portal Trigger
       const distToCave = portalToValley.position.distanceTo(playerPos);
-      if (distToCave < 3.2) {
+      if (distToCave < 3.8) {
         this.currentPrompt = {
           type: 'PORTAL',
-          title: 'Ancient Glowing Cave',
-          subtitle: 'A mystical passage leading to Mystic Valley',
-          actionText: 'Enter Mystic Valley',
+          title: 'Waterfall Cliff Portal',
+          subtitle: 'Ancient passage to Destination Hub & Mystic Valley',
+          actionText: 'Enter Destination Hub',
           targetId: 'portal_valley',
           position: portalToValley.position
         };
@@ -56,8 +56,8 @@ export class InteractionManager {
             this.currentPrompt = {
               type: 'EGG',
               title: egg.name,
-              subtitle: 'An unknown Solander sleeps inside...',
-              actionText: `Hatch ${creatureName}`,
+              subtitle: 'An ancient Solander egg glows softly...',
+              actionText: `Hatch ${creatureName} Egg`,
               targetId: egg.id,
               position: egg.mesh.position
             };
@@ -89,8 +89,8 @@ export class InteractionManager {
             this.currentPrompt = {
               type: 'RESOURCE',
               title: resNode.name,
-              subtitle: 'Gather resource for your Solander',
-              actionText: `Gather ${resNode.name}`,
+              subtitle: 'Shimmering natural resource',
+              actionText: `Collect ${resNode.name}`,
               targetId: resNode.id,
               position: resNode.position
             };
@@ -105,8 +105,8 @@ export class InteractionManager {
         if (dist < 3.0) {
           this.currentPrompt = {
             type: 'TRIAL',
-            title: 'Ancient Solander Trial Altar',
-            subtitle: 'Test your companion\'s Curiosity, Bravery & Energy',
+            title: 'Ancient Trial Altar',
+            subtitle: 'Test your companion\'s stats & bond',
             actionText: 'Begin Solander Trial',
             targetId: 'trial_altar',
             position: mysticValley.trialPedestal.position
@@ -122,8 +122,8 @@ export class InteractionManager {
           this.currentPrompt = {
             type: 'DISCOVERY',
             title: point.name,
-            subtitle: point.discovered ? 'Ancient Memory recorded' : 'Unexplored Ancient Memory',
-            actionText: point.discovered ? 'Commune Again' : 'Discover Memory',
+            subtitle: point.discovered ? 'Ancient Memory recorded' : 'Unexplored Celestial Memory',
+            actionText: point.discovered ? 'Commune with Memory' : 'Discover Memory',
             targetId: point.id,
             position: point.position
           };
@@ -136,12 +136,12 @@ export class InteractionManager {
     if (currentWorld === 'GARDEN') {
       for (const creature of allCreatures) {
         const dist = creature.position.distanceTo(playerPos);
-        if (dist < 2.5) {
+        if (dist < 2.8) {
           this.currentPrompt = {
             type: 'COMPANION',
             title: creature.data.name,
-            subtitle: `Mood: ${creature.data.personality} • Bond: ${creature.data.bond}%`,
-            actionText: `Pet ${creature.data.name}`,
+            subtitle: `Bond: ${creature.data.bond}% • ${creature.data.personality}`,
+            actionText: `Interact with ${creature.data.name}`,
             targetId: creature.data.id,
             position: creature.position
           };
@@ -150,12 +150,12 @@ export class InteractionManager {
       }
     } else if (companionCreature) {
       const distToCompanion = companionCreature.position.distanceTo(playerPos);
-      if (distToCompanion < 2.5) {
+      if (distToCompanion < 2.8) {
         this.currentPrompt = {
           type: 'COMPANION',
           title: companionCreature.data.name,
-          subtitle: `Mood: ${companionCreature.data.personality} • Bond: ${companionCreature.data.bond}%`,
-          actionText: `Pet ${companionCreature.data.name}`,
+          subtitle: `Bond: ${companionCreature.data.bond}% • ${companionCreature.data.personality}`,
+          actionText: `Interact with ${companionCreature.data.name}`,
           targetId: companionCreature.data.id,
           position: companionCreature.position
         };
@@ -171,7 +171,9 @@ export class InteractionManager {
     garden: SolanderGardenWorld,
     mysticValley: MysticValleyWorld,
     allCreatures: SolanderCreature[],
-    onWorldSwitch: (targetWorld: 'GARDEN' | 'MYSTIC_VALLEY') => void
+    onWorldSwitch: (targetWorld: 'GARDEN' | 'MYSTIC_VALLEY') => void,
+    onOpenDestinationHub?: () => void,
+    onInspectChao?: (creatureId: string) => void
   ) {
     if (prompt.type === 'EGG') {
       const egg = garden.eggs.find(e => e.id === prompt.targetId);
@@ -209,12 +211,20 @@ export class InteractionManager {
         creature.triggerHappyReaction();
         sound.playChirp();
         saveSystem.increaseBond(5);
-        saveSystem.setMessage(`❤️ You petted ${creature.data.name}! Bond & happiness increased.`);
+        if (onInspectChao) {
+          onInspectChao(prompt.targetId);
+        } else {
+          saveSystem.setMessage(`❤️ You petted ${creature.data.name}! Bond & happiness increased.`);
+        }
       }
     } else if (prompt.type === 'PORTAL') {
       if (prompt.targetId === 'portal_valley') {
         sound.playTeleport();
-        onWorldSwitch('MYSTIC_VALLEY');
+        if (onOpenDestinationHub) {
+          onOpenDestinationHub();
+        } else {
+          onWorldSwitch('MYSTIC_VALLEY');
+        }
       } else {
         sound.playTeleport();
         onWorldSwitch('GARDEN');

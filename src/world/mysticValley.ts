@@ -53,7 +53,13 @@ export class MysticValleyWorld {
 
   public getGroundHeight(x: number, z: number): number {
     const d = Math.hypot(x, z);
-    if (d > 35) return -2.0;
+    if (d > 36) return -2.0;
+
+    // Dedicated Downhill Momentum Slope Section (x between -10 and 10, z between -28 and 5)
+    if (Math.abs(x) < 12 && z > -28 && z < 5) {
+      const slopeFactor = (-z / 28.0) * 8.5; // High steep hill going down towards z = 5!
+      return Math.max(0, slopeFactor + Math.sin(x * 0.3) * 0.4);
+    }
 
     // Valley terrain with central plateau and surrounding ridges
     const h1 = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 1.2;
@@ -62,7 +68,7 @@ export class MysticValleyWorld {
   }
 
   private buildTerrain() {
-    const geo = new THREE.PlaneGeometry(70, 70, 64, 64);
+    const geo = new THREE.PlaneGeometry(75, 75, 80, 80);
     geo.rotateX(-Math.PI / 2);
 
     const pos = geo.attributes.position;
@@ -78,6 +84,25 @@ export class MysticValleyWorld {
     const terrain = new THREE.Mesh(geo, mat);
     terrain.receiveShadow = true;
     this.group.add(terrain);
+
+    // Build Wooden Launch Ramp at bottom of downhill run (x = 0, z = 4)
+    const rampGroup = new THREE.Group();
+    const rampGeo = new THREE.BoxGeometry(4.0, 0.4, 6.0);
+    rampGeo.rotateX(-0.35); // Tilted launch angle!
+    const woodMat = new THREE.MeshToonMaterial({ color: 0x854d0e });
+    const rampMesh = new THREE.Mesh(rampGeo, woodMat);
+    rampMesh.position.set(0, 1.2, 4);
+
+    const rimGeo = new THREE.BoxGeometry(0.3, 0.6, 6.0);
+    rimGeo.rotateX(-0.35);
+    const cyanRimMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x0284c7, emissiveIntensity: 1.5 });
+    const lRim = new THREE.Mesh(rimGeo, cyanRimMat);
+    lRim.position.set(-2.0, 1.3, 4);
+    const rRim = new THREE.Mesh(rimGeo, cyanRimMat);
+    rRim.position.set(2.0, 1.3, 4);
+
+    rampGroup.add(rampMesh, lRim, rRim);
+    this.group.add(rampGroup);
   }
 
   private buildMountains() {

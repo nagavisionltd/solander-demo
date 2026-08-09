@@ -11,10 +11,13 @@ export class SolanderGardenWorld {
   public group: THREE.Group;
   public eggs: SolanderEggMesh[] = [];
   private fireflies!: THREE.Points;
+  private airborneSpores!: THREE.Points;
+  private mistPuffs: THREE.Mesh[] = [];
+  private godRays: THREE.Mesh[] = [];
   public waterMesh!: THREE.Mesh;
   private waterfallStream!: THREE.Mesh;
-  public poolCenter: THREE.Vector3 = new THREE.Vector3(0, -0.2, -8);
-  public poolRadius: number = 6.8;
+  public poolCenter: THREE.Vector3 = new THREE.Vector3(0, -0.2, -7.5);
+  public poolRadius: number = 13.5;
 
   constructor() {
     this.group = new THREE.Group();
@@ -25,6 +28,7 @@ export class SolanderGardenWorld {
     this.buildPaths();
     this.buildFoliageAndProps();
     this.buildEggs();
+    this.buildEtherealAtmosphere();
 
     // Fireflies / Floating sparkles
     const particleGeo = new THREE.BufferGeometry();
@@ -45,9 +49,85 @@ export class SolanderGardenWorld {
     });
     this.fireflies = new THREE.Points(particleGeo, particleMat);
     this.group.add(this.fireflies);
+  }
 
-    const dummyGeo = new THREE.PlaneGeometry(1, 1);
-    this.waterfallStream = new THREE.Mesh(dummyGeo);
+  private buildEtherealAtmosphere() {
+    // 1. WATERFALL MIST PARTICLES SYSTEM
+    const puffGeo = new THREE.SphereGeometry(0.75, 12, 12);
+    const puffMat = new THREE.MeshStandardMaterial({
+      color: 0xe0f2fe,
+      emissive: 0x38bdf8,
+      emissiveIntensity: 0.4,
+      transparent: true,
+      opacity: 0.38,
+      depthWrite: false
+    });
+
+    for (let i = 0; i < 38; i++) {
+      const puff = new THREE.Mesh(puffGeo, puffMat);
+      puff.position.set(
+        (Math.random() - 0.5) * 5.2,
+        0.1 + Math.random() * 2.8,
+        -13.2 + (Math.random() - 0.5) * 3.0
+      );
+      puff.scale.setScalar(0.6 + Math.random() * 0.8);
+      puff.userData = {
+        baseY: puff.position.y,
+        speed: 0.4 + Math.random() * 0.8,
+        swayPhase: Math.random() * Math.PI * 2
+      };
+      this.group.add(puff);
+      this.mistPuffs.push(puff);
+    }
+
+    // 2. VOLUMETRIC GOD RAYS / SKY LIGHT SHAFTS (Sky: Children of the Light Style)
+    const rayGeo = new THREE.CylinderGeometry(0.3, 3.2, 22, 16, 1, true);
+    const rayMat = new THREE.MeshBasicMaterial({
+      color: 0xfef08a,
+      transparent: true,
+      opacity: 0.24,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const rayPositions = [
+      { x: 0, y: 7.5, z: -12.2, rx: 0.1, rz: -0.05 },
+      { x: -2.8, y: 7.0, z: -9.5, rx: 0.14, rz: 0.12 },
+      { x: 2.8, y: 7.2, z: -10.2, rx: 0.08, rz: -0.14 },
+      { x: 6.5, y: 6.8, z: -5.5, rx: 0.18, rz: -0.16 },
+      { x: -6.5, y: 6.8, z: -4.5, rx: 0.16, rz: 0.18 }
+    ];
+
+    rayPositions.forEach((rp, idx) => {
+      const ray = new THREE.Mesh(rayGeo, rayMat);
+      ray.position.set(rp.x, rp.y, rp.z);
+      ray.rotation.set(rp.rx, 0, rp.rz);
+      ray.userData = { index: idx };
+      this.group.add(ray);
+      this.godRays.push(ray);
+    });
+
+    // 3. AIRBORNE LIGHT SPORES / DANDELION SEEDS (Sky: Children of the Light Style)
+    const sporeCount = 120;
+    const sporeGeo = new THREE.BufferGeometry();
+    const sporePos = new Float32Array(sporeCount * 3);
+    for (let i = 0; i < sporeCount * 3; i += 3) {
+      sporePos[i] = (Math.random() - 0.5) * 50;
+      sporePos[i + 1] = 0.2 + Math.random() * 8.0;
+      sporePos[i + 2] = (Math.random() - 0.5) * 50;
+    }
+    sporeGeo.setAttribute('position', new THREE.BufferAttribute(sporePos, 3));
+
+    const sporeMat = new THREE.PointsMaterial({
+      color: 0xfef08a,
+      size: 0.22,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
+    this.airborneSpores = new THREE.Points(sporeGeo, sporeMat);
+    this.group.add(this.airborneSpores);
   }
 
   public isPosInWater(x: number, z: number): boolean {
@@ -59,13 +139,27 @@ export class SolanderGardenWorld {
     const d = Math.hypot(x, z);
     if (d > 28) return -2.0; // Boundary drop
 
-    // Central Waterfall Swimming Pool (Center: x: 0, z: -8)
-    const distToPool = Math.hypot(x - this.poolCenter.x, z - this.poolCenter.z);
-    if (distToPool < this.poolRadius) {
-      return -0.8 - (this.poolRadius - distToPool) * 0.12; // Underwater bed!
+    // Winding Stone Stair Platforms to top of Waterfall Cliff (Right side x: 3.5 to 6.5, z: -10 to -16)
+    if (x >= 3.0 && x <= 6.8 && z <= -10.0 && z >= -16.0) {
+      if (z > -11.2) return 0.8;
+      if (z > -12.6) return 1.6;
+      if (z > -14.0) return 2.6;
+      if (z > -15.2) return 3.6;
+      return 4.6; // Top Stair Ledge
     }
 
-    // Waterfall Cliff behind pool (z < -14)
+    // Top Waterfall Lookout Ledge (z <= -14.8, x between -3 and 3)
+    if (z <= -14.8 && Math.abs(x) < 3.5) {
+      return 4.8;
+    }
+
+    // Central Waterfall Swimming Pool (Center: x: 0, z: -7.5)
+    const distToPool = Math.hypot(x - this.poolCenter.x, z - this.poolCenter.z);
+    if (distToPool < this.poolRadius) {
+      return -0.9 - (this.poolRadius - distToPool) * 0.1; // Underwater bed!
+    }
+
+    // Waterfall Cliff behind pool (z < -13.5)
     if (z < -13.5 && Math.abs(x) < 7) {
       return 4.5 + ( -13.5 - z ) * 0.8;
     }
@@ -162,21 +256,117 @@ export class SolanderGardenWorld {
     foam.position.set(0, -0.1, -13.2);
     cliffGroup.add(foam);
 
+    // 3. Winding Carved Stone Stair Platforms up the Waterfall Cliff
+    const stairGeo = new THREE.BoxGeometry(2.2, 0.4, 1.4);
+    const stairMat = new THREE.MeshToonMaterial({ color: 0x64748b });
+    const mossMat = new THREE.MeshToonMaterial({ color: 0x4ade80 });
+
+    const stairSteps = [
+      { x: 4.5, y: 0.6, z: -10.6, rotY: 0.1 },
+      { x: 5.4, y: 1.4, z: -11.9, rotY: 0.25 },
+      { x: 5.8, y: 2.4, z: -13.3, rotY: 0.4 },
+      { x: 4.8, y: 3.4, z: -14.6, rotY: -0.2 },
+      { x: 2.2, y: 4.4, z: -15.2, rotY: -0.5 }
+    ];
+
+    stairSteps.forEach((s, idx) => {
+      const step = new THREE.Mesh(stairGeo, stairMat);
+      step.position.set(s.x, s.y, s.z);
+      step.rotation.y = s.rotY;
+      step.castShadow = true;
+      step.receiveShadow = true;
+
+      // Moss patch on top of step
+      const patchGeo = new THREE.BoxGeometry(1.8, 0.05, 1.0);
+      const patch = new THREE.Mesh(patchGeo, mossMat);
+      patch.position.set(0, 0.21, 0);
+      step.add(patch);
+
+      cliffGroup.add(step);
+    });
+
+    // 4. Grand Dark Cave Hole Entrance Cut into Stone Cliff (Left Side x: -4.5, z: -14.2)
+    const caveGroup = new THREE.Group();
+
+    // Dark Obsidian Hole Arch Outer Rim
+    const caveRimGeo = new THREE.TorusGeometry(2.4, 0.5, 12, 24, Math.PI);
+    const caveRimMat = new THREE.MeshToonMaterial({ color: 0x1e293b });
+    const caveRim = new THREE.Mesh(caveRimGeo, caveRimMat);
+    caveRim.position.set(0, 0, 0);
+    caveGroup.add(caveRim);
+
+    // Deep Dark Portal Hole (Pitch black cylinder interior)
+    const holeGeo = new THREE.CylinderGeometry(2.1, 2.1, 2.8, 24, 1, false, 0, Math.PI);
+    const holeMat = new THREE.MeshBasicMaterial({ color: 0x020617 }); // Void black
+    const hole = new THREE.Mesh(holeGeo, holeMat);
+    hole.rotation.x = Math.PI / 2;
+    hole.position.set(0, 0, -1.0);
+    caveGroup.add(hole);
+
+    // Glowing Ancient Blue Rune Ring
+    const runeRingGeo = new THREE.TorusGeometry(2.0, 0.08, 12, 24, Math.PI);
+    const runeRingMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x0284c7,
+      emissiveIntensity: 1.2
+    });
+    const runeRing = new THREE.Mesh(runeRingGeo, runeRingMat);
+    runeRing.position.set(0, 0, 0.1);
+    caveGroup.add(runeRing);
+
+    caveGroup.position.set(-4.5, 1.6, -14.2);
+    cliffGroup.add(caveGroup);
+
     this.group.add(cliffGroup);
 
-    // Lilypads in Pool
-    const padGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.02, 12);
+    // Lilypads & Floating Lotus Flowers in Pool
+    const padGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.02, 16);
     const padMat = new THREE.MeshToonMaterial({ color: 0x15803d });
+    const lotusMat = new THREE.MeshToonMaterial({ color: 0xf43f5e });
+
     [
-      { x: -2.5, z: -7.2 },
-      { x: 3.2, z: -9.1 },
-      { x: -1.2, z: -5.8 },
-      { x: 2.8, z: -6.5 }
-    ].forEach(p => {
+      { x: -5.5, z: -8.2 },
+      { x: 6.2, z: -10.1 },
+      { x: -3.2, z: -4.8 },
+      { x: 5.8, z: -5.5 },
+      { x: -7.0, z: -6.0 },
+      { x: 7.5, z: -8.5 }
+    ].forEach((p, idx) => {
       const pad = new THREE.Mesh(padGeo, padMat);
       pad.position.set(p.x, -0.12, p.z);
+
+      if (idx % 2 === 0) {
+        const lotusGeo = new THREE.SphereGeometry(0.2, 8, 8);
+        const lotus = new THREE.Mesh(lotusGeo, lotusMat);
+        lotus.position.set(0, 0.15, 0);
+        pad.add(lotus);
+      }
       this.group.add(pad);
     });
+
+    // Wooden Swimming Pier / Dock extending into the Lake
+    const dockGroup = new THREE.Group();
+    const plankMat = new THREE.MeshToonMaterial({ color: 0x78350f });
+    const poleMat = new THREE.MeshToonMaterial({ color: 0x451a03 });
+
+    for (let p = 0; p < 6; p++) {
+      const plankGeo = new THREE.BoxGeometry(2.4, 0.12, 0.6);
+      const plank = new THREE.Mesh(plankGeo, plankMat);
+      plank.position.set(0, 0.08, p * 0.7);
+      plank.castShadow = true;
+      dockGroup.add(plank);
+
+      if (p % 2 === 0) {
+        const postGeo = new THREE.CylinderGeometry(0.1, 0.1, 1.2, 8);
+        const lPost = new THREE.Mesh(postGeo, poleMat);
+        lPost.position.set(-1.1, -0.5, p * 0.7);
+        const rPost = new THREE.Mesh(postGeo, poleMat);
+        rPost.position.set(1.1, -0.5, p * 0.7);
+        dockGroup.add(lPost, rPost);
+      }
+    }
+    dockGroup.position.set(0, 0, 3.5);
+    this.group.add(dockGroup);
   }
 
   private buildPaths() {
@@ -403,6 +593,45 @@ export class SolanderGardenWorld {
     // Animate pool water surface pulse
     if (this.waterMesh) {
       this.waterMesh.position.y = this.poolCenter.y + Math.sin(time * 2) * 0.03;
+    }
+
+    // Animate Waterfall Mist Puffs
+    this.mistPuffs.forEach((puff, idx) => {
+      const data = puff.userData;
+      puff.position.y += data.speed * 0.008;
+      puff.position.x += Math.sin(time * 1.5 + data.swayPhase) * 0.006;
+      puff.position.z += Math.cos(time * 1.2 + data.swayPhase) * 0.006;
+      const mat = puff.material as THREE.MeshStandardMaterial;
+
+      // Expand puff as it rises, then reset when high
+      if (puff.position.y > data.baseY + 2.8) {
+        puff.position.y = data.baseY;
+        mat.opacity = 0.38;
+      } else {
+        const heightProgress = (puff.position.y - data.baseY) / 2.8;
+        mat.opacity = THREE.MathUtils.lerp(0.38, 0, heightProgress);
+        puff.scale.setScalar(0.6 + heightProgress * 1.2);
+      }
+    });
+
+    // Animate Volumetric God Rays
+    this.godRays.forEach((ray, idx) => {
+      const mat = ray.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.18 + Math.sin(time * 1.8 + idx * 1.2) * 0.08;
+      ray.rotation.z = Math.sin(time * 0.5 + idx) * 0.03;
+    });
+
+    // Animate Airborne Light Spores (Sky: Children of the Light Style)
+    if (this.airborneSpores) {
+      const pos = this.airborneSpores.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        let y = pos.getY(i) + Math.sin(time * 0.8 + i) * 0.004 + 0.003;
+        let x = pos.getX(i) + Math.cos(time * 0.5 + i) * 0.003;
+        if (y > 9.0) y = 0.2;
+        pos.setY(i, y);
+        pos.setX(i, x);
+      }
+      pos.needsUpdate = true;
     }
 
     // Animate glowing eggs gentle bobbing & wobble
