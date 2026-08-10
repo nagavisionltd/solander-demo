@@ -5,12 +5,38 @@ import { sound } from '../systems/audio';
 import { SolanderCreature } from '../creatures/solander';
 import { SolanderLaserGun } from '../combat/weapons';
 
+function createCustomToonRampTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 1;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const gradient = ctx.createLinearGradient(0, 0, 256, 0);
+    gradient.addColorStop(0.00, '#323242'); // Soft ambient shadow
+    gradient.addColorStop(0.32, '#6b6b80'); // Soft penumbra transition
+    gradient.addColorStop(0.58, '#b8b8cc'); // Soft midtone
+    gradient.addColorStop(0.88, '#f0f0f8'); // Crisp diffuse light
+    gradient.addColorStop(1.00, '#ffffff'); // Full specular light
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 256, 1);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+  return texture;
+}
+
 export type PlayerState =
   | 'IDLE'
   | 'WALK'
   | 'RUN'
   | 'SUPER_RUN'
   | 'TOP_SPEED'
+  | 'MACH_RUN'
+  | 'SPINDASH_CHARGE'
+  | 'SPRING_LAUNCH'
   | 'SPRINT'
   | 'JUMP'
   | 'PEAK'
@@ -23,12 +49,33 @@ export type PlayerState =
   | 'MELEE_COMBO'
   | 'LASER_ATTACK';
 
+export type JumpPhase = 'NONE' | 'LAUNCH' | 'APEX' | 'FALL';
+
 export class Player {
   public mesh: THREE.Group;
   public position: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
   public velocity: THREE.Vector3 = new THREE.Vector3();
   public rotationY: number = 0;
   public currentState: PlayerState = 'IDLE';
+  public jumpPhase: JumpPhase = 'NONE';
+
+  // Spindash & Sonic Mechanics
+  public isSpindashing: boolean = false;
+  public spindashTier: number = 0;
+  public spindashChargeTimer: number = 0;
+  public continuousMoveTimer: number = 0;
+  public isSpringLaunched: boolean = false;
+  public springLaunchTimer: number = 0;
+  public currentSpeedStage: number = 1;
+  public speedStageName: string = 'STAGE 1: JOG';
+  public activeMaxSpeed: number = 16.0;
+
+  public getSpeedCapacityRatio(): number {
+    const activeCap = Math.max(16.0, this.activeMaxSpeed || 16.0);
+    const tierRatio = this.currentHorizontalSpeed / activeCap;
+    const overallRatio = this.currentHorizontalSpeed / 88.0;
+    return Math.max(tierRatio, overallRatio);
+  }
 
   // Body Parts & Mesh Hierarchy
   private headGroup: THREE.Group;
@@ -102,8 +149,10 @@ export class Player {
   constructor() {
     this.mesh = new THREE.Group();
 
-    // High Definition Palette & Cel-Shaded Materials
-    const furMat = new THREE.MeshToonMaterial({ color: 0x3b0764 }); // Deep purple cosmic panther fur
+    // High Definition Palette & Custom Cel-Shaded Ramp Materials
+    const toonRamp = createCustomToonRampTexture();
+
+    const furMat = new THREE.MeshToonMaterial({ color: 0x3b0764, gradientMap: toonRamp }); // Deep purple cosmic panther fur
     const spotGoldMat = new THREE.MeshStandardMaterial({
       color: 0xfacc15,
       emissive: 0xeab308,
@@ -115,9 +164,9 @@ export class Player {
       emissiveIntensity: 0.8
     }); // Glowing cyan spots
 
-    const innerEarMat = new THREE.MeshToonMaterial({ color: 0xc084fc }); // Light lavender inner ear
-    const muzzleMat = new THREE.MeshToonMaterial({ color: 0x581c87 }); // Soft purple feline muzzle
-    const noseMat = new THREE.MeshToonMaterial({ color: 0xf43f5e }); // Pink feline nose
+    const innerEarMat = new THREE.MeshToonMaterial({ color: 0xc084fc, gradientMap: toonRamp }); // Light lavender inner ear
+    const muzzleMat = new THREE.MeshToonMaterial({ color: 0x581c87, gradientMap: toonRamp }); // Soft purple feline muzzle
+    const noseMat = new THREE.MeshToonMaterial({ color: 0xf43f5e, gradientMap: toonRamp }); // Pink feline nose
     const fangMat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Sharp white fangs
     const eyeMat = new THREE.MeshStandardMaterial({
       color: 0xf59e0b,
@@ -127,21 +176,21 @@ export class Player {
     const pupilMat = new THREE.MeshBasicMaterial({ color: 0x0f172a }); // Deep pupil
     const eyeGlintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-    // Neelo's Explorer Outfit Materials
-    const vestMat = new THREE.MeshToonMaterial({ color: 0x0284c7 }); // Explorer cyan-blue vest
-    const vestDarkMat = new THREE.MeshToonMaterial({ color: 0x0369a1 }); // Pocket flaps & lining
-    const goldTrimMat = new THREE.MeshToonMaterial({ color: 0xfacc15 }); // Zipper, buttons, buckles
-    const shortsMat = new THREE.MeshToonMaterial({ color: 0x78350f }); // Brown adventurer shorts
-    const beltMat = new THREE.MeshToonMaterial({ color: 0x451a03 }); // Dark leather belt & pouches
-    const armorPadMat = new THREE.MeshToonMaterial({ color: 0x475569 }); // Knee armor plates
+    // Neelo's Explorer Outfit Materials with Toon Ramp
+    const vestMat = new THREE.MeshToonMaterial({ color: 0x0284c7, gradientMap: toonRamp }); // Explorer cyan-blue vest
+    const vestDarkMat = new THREE.MeshToonMaterial({ color: 0x0369a1, gradientMap: toonRamp }); // Pocket flaps & lining
+    const goldTrimMat = new THREE.MeshToonMaterial({ color: 0xfacc15, gradientMap: toonRamp }); // Zipper, buttons, buckles
+    const shortsMat = new THREE.MeshToonMaterial({ color: 0x78350f, gradientMap: toonRamp }); // Brown adventurer shorts
+    const beltMat = new THREE.MeshToonMaterial({ color: 0x451a03, gradientMap: toonRamp }); // Dark leather belt & pouches
+    const armorPadMat = new THREE.MeshToonMaterial({ color: 0x475569, gradientMap: toonRamp }); // Knee armor plates
     const armorTrimMat = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
       emissive: 0x0284c7,
       emissiveIntensity: 0.6
     }); // Cyan armor edge trim
-    const gloveMat = new THREE.MeshToonMaterial({ color: 0x1e293b }); // Tactical wrist cuffs / gloves
-    const shoeMat = new THREE.MeshToonMaterial({ color: 0x4c1d95 }); // Purple explorer boots
-    const shoeCollarMat = new THREE.MeshToonMaterial({ color: 0x06b6d4 }); // Cyan boot top collar
+    const gloveMat = new THREE.MeshToonMaterial({ color: 0x1e293b, gradientMap: toonRamp }); // Tactical wrist cuffs / gloves
+    const shoeMat = new THREE.MeshToonMaterial({ color: 0x4c1d95, gradientMap: toonRamp }); // Purple explorer boots
+    const shoeCollarMat = new THREE.MeshToonMaterial({ color: 0x06b6d4, gradientMap: toonRamp }); // Cyan boot top collar
     const soleMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc }); // Thick white boot soles
 
     // ==========================================
@@ -735,6 +784,35 @@ export class Player {
     return true;
   }
 
+  public triggerDashPanel(directionAngle: number, dashSpeed: number = 68.0) {
+    this.rotationY = directionAngle;
+    this.currentHorizontalSpeed = dashSpeed;
+    const forward = new THREE.Vector3(Math.sin(directionAngle), 0, Math.cos(directionAngle));
+    this.velocity.x = forward.x * dashSpeed;
+    this.velocity.z = forward.z * dashSpeed;
+    this.isRolling = true;
+    this.rollTimer = 0.8;
+    this.squashStretch.set(0.6, 0.6, 1.5);
+    this.emitDustBurst(2.5);
+    sound.playDashPanel();
+  }
+
+  public triggerSpringPad(upwardForce: number = 28.0, forwardSpeed: number = 18.0) {
+    this.velocity.y = upwardForce;
+    this.isGrounded = false;
+    this.isSpringLaunched = true;
+    this.springLaunchTimer = 1.2;
+    this.currentState = 'SPRING_LAUNCH';
+    if (forwardSpeed > 0) {
+      const forward = new THREE.Vector3(Math.sin(this.rotationY), 0, Math.cos(this.rotationY));
+      this.velocity.x = forward.x * forwardSpeed;
+      this.velocity.z = forward.z * forwardSpeed;
+    }
+    this.squashStretch.set(0.5, 1.8, 0.5);
+    this.emitDustBurst(2.0);
+    sound.playSpringLaunch();
+  }
+
   public startPetting() {
     this.isPetting = true;
     this.pettingTimer = 1.2;
@@ -814,10 +892,55 @@ export class Player {
       }
     }
 
+    // Handle Spindash & Somersault Roll Logic
+    const isRollHeld = inputManager.isRollPressed;
+    const isRollClicked = inputManager.consumeRoll();
+
+    if (this.isGrounded && !this.isSwimming) {
+      if (isRollClicked && this.currentHorizontalSpeed > 10.0 && !this.isRolling) {
+        // Somersault Roll while running!
+        this.isRolling = true;
+        this.rollTimer = 0.75;
+        this.currentHorizontalSpeed = Math.max(this.currentHorizontalSpeed, 38.0);
+        sound.playSpinAttackSound();
+        this.emitDustBurst(1.2);
+      } else if (isRollHeld && this.currentHorizontalSpeed < 10.0) {
+        // Spindash Rev Charge!
+        if (!this.isSpindashing) {
+          this.isSpindashing = true;
+          this.spindashTier = 1;
+          this.spindashChargeTimer = 0;
+          sound.playSpindashCharge(1);
+          this.emitDustBurst(1.0);
+        } else {
+          this.spindashChargeTimer += deltaTime;
+          if (this.spindashChargeTimer > 0.16 && this.spindashTier < 3) {
+            this.spindashTier++;
+            this.spindashChargeTimer = 0;
+            sound.playSpindashCharge(this.spindashTier);
+            this.emitDustBurst(0.8 + this.spindashTier * 0.4);
+          }
+        }
+      } else if (this.isSpindashing && !isRollHeld) {
+        // Spindash Release Supersonic Launch!
+        this.isSpindashing = false;
+        this.isRolling = true;
+        this.rollTimer = 0.95;
+        const launchSpeed = 42.0 + this.spindashTier * 11.0; // Up to 75 speed!
+        this.currentHorizontalSpeed = launchSpeed;
+        const facingDir = new THREE.Vector3(Math.sin(this.rotationY), 0, Math.cos(this.rotationY));
+        this.velocity.x = facingDir.x * launchSpeed;
+        this.velocity.z = facingDir.z * launchSpeed;
+        sound.playSpindashRelease();
+        this.emitDustBurst(2.5);
+        this.squashStretch.set(0.65, 0.65, 1.45);
+      }
+    }
+
     // Handle Momentum Roll
     if (this.isRolling) {
       this.rollTimer -= deltaTime;
-      this.mesh.rotation.x += deltaTime * 26; // Ball spin
+      this.mesh.rotation.x += deltaTime * 28; // Ball spin
       const op = Math.sin((0.55 - this.rollTimer) / 0.55 * Math.PI);
       (this.spinTrail.material as THREE.MeshStandardMaterial).opacity = op;
       (this.energyBallMesh.material as THREE.MeshStandardMaterial).opacity = op * 0.85;
@@ -862,50 +985,102 @@ export class Player {
     );
     const slopeHeightDiff = nextH - currentH;
 
-    // Determine Base Target Speed
-    let maxTopSpeed = 14.5; // Normal Run Speed
-    if (inputManager.isSprintHeld) maxTopSpeed = 24.5; // Sprint Speed
-    if (this.isRolling) maxTopSpeed = 30.0; // Roll Speed
+    // Determine SA2 High Top Speed & Multi-Stage Gear Acceleration Build-Up
+    if (isInputtingMove) {
+      this.continuousMoveTimer += deltaTime;
+    } else {
+      this.continuousMoveTimer = 0;
+    }
+
+    // Progressive Multi-Tier Sonic Acceleration Curve
+    let maxTopSpeed = 16.0; // Stage 1: Base Jog
+    let newStage = 1;
+    let newStageName = 'STAGE 1: JOG';
+
+    if (this.continuousMoveTimer > 0.4) {
+      maxTopSpeed = 28.0; // Stage 2: Building Sprint
+      newStage = 2;
+      newStageName = 'STAGE 2: SPRINT';
+    }
+    if (this.continuousMoveTimer > 1.2) {
+      maxTopSpeed = 44.0; // Stage 3: High Speed Run
+      newStage = 3;
+      newStageName = 'STAGE 3: HIGH SPEED';
+    }
+    if (this.continuousMoveTimer > 2.2) {
+      maxTopSpeed = 60.0; // Stage 4: Supersonic Boost
+      newStage = 4;
+      newStageName = 'STAGE 4: SUPERSONIC';
+    }
+    if (this.continuousMoveTimer > 3.4) {
+      maxTopSpeed = 74.0; // Stage 5: Mach Velocity
+      newStage = 5;
+      newStageName = 'STAGE 5: MACH VELOCITY';
+    }
+    if (this.continuousMoveTimer > 4.8) {
+      maxTopSpeed = 88.0; // Stage 6: Hyper Overdrive TOP SPEED!
+      newStage = 6;
+      newStageName = 'STAGE 6: HYPER OVERDRIVE';
+    }
+
+    // Emit speed stage shift effect on tier change
+    if (newStage > this.currentSpeedStage && isInputtingMove) {
+      this.emitDustBurst(1.8);
+      sound.playChirp();
+    }
+    this.currentSpeedStage = newStage;
+    this.speedStageName = newStageName;
+
+    if (this.isRolling) {
+      maxTopSpeed = Math.max(maxTopSpeed, 92.0); // Supersonic Spindash / Roll Speed
+      this.speedStageName = 'SPINDASH ROLL!';
+    }
 
     // Slope influence
     if (slopeHeightDiff < -0.05) {
-      maxTopSpeed += Math.abs(slopeHeightDiff) * 20.0; // Downhill speed boost
+      maxTopSpeed += Math.abs(slopeHeightDiff) * 28.0; // Downhill momentum boost!
     } else if (slopeHeightDiff > 0.05) {
-      maxTopSpeed = Math.max(5.5, maxTopSpeed - slopeHeightDiff * 8.0); // Uphill drag
+      maxTopSpeed = Math.max(10.0, maxTopSpeed - slopeHeightDiff * 12.0); // Uphill drag
     }
 
-    if (this.isSwimming) maxTopSpeed *= 0.55;
+    if (this.isSwimming) maxTopSpeed *= 0.50;
 
     // Acceleration & Friction
     if (isInputtingMove) {
       moveDir.normalize();
 
-      const speedRatio = Math.min(1, this.currentHorizontalSpeed / 24.0);
+      const speedRatio = Math.min(1, this.currentHorizontalSpeed / 45.0);
 
-      if (!this.isRolling) {
+      if (!this.isRolling && !this.isSpindashing) {
         const targetAngle = Math.atan2(moveDir.x, moveDir.z);
         let angleDiff = targetAngle - this.rotationY;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-        const turnRate = this.isGrounded ? THREE.MathUtils.lerp(20.0, 7.0, speedRatio) : 18.0;
+        // Sharp turn drift penalty (bleeding speed when making sharp turns)
+        if (Math.abs(angleDiff) > Math.PI * 0.5 && this.currentHorizontalSpeed > 20.0) {
+          this.currentHorizontalSpeed *= 0.82; // Drift friction loss
+          this.emitDustBurst(1.2);
+        }
+
+        const turnRate = this.isGrounded ? THREE.MathUtils.lerp(18.0, 6.5, speedRatio) : 14.0;
         this.rotationY += angleDiff * Math.min(1, deltaTime * turnRate);
         this.mesh.rotation.y = this.rotationY;
 
-        // Dynamic Bank/Lean into turns (SA2 style!)
+        // Dynamic Bank/Lean into turns
         if (this.isGrounded) {
-          const bankAngle = THREE.MathUtils.clamp(-angleDiff * speedRatio * 0.45, -0.4, 0.4);
-          this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, bankAngle, deltaTime * 9.0);
+          const bankAngle = THREE.MathUtils.clamp(-angleDiff * speedRatio * 0.55, -0.5, 0.5);
+          this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, bankAngle, deltaTime * 10.0);
         }
       }
 
-      // Accelerate towards target speed
-      const accelRate = this.isGrounded ? (inputManager.isSprintHeld ? 32.0 : 24.0) : 16.0; // High air control
+      // Smooth, deliberate acceleration build up
       this.targetHorizontalSpeed = maxTopSpeed;
+      const accelFactor = THREE.MathUtils.lerp(1.2, 2.8, Math.min(1, this.continuousMoveTimer / 3.0));
       this.currentHorizontalSpeed = THREE.MathUtils.lerp(
         this.currentHorizontalSpeed,
         this.targetHorizontalSpeed,
-        deltaTime * (accelRate / 10.0)
+        deltaTime * accelFactor
       );
 
       const moveFacing = new THREE.Vector3(Math.sin(this.rotationY), 0, Math.cos(this.rotationY));
@@ -916,48 +1091,57 @@ export class Player {
 
       if (!this.isSwimming && this.isGrounded) {
         this.stepSoundTimer += deltaTime;
-        const stepInterval = Math.max(0.1, 0.3 - (this.currentHorizontalSpeed / 18.0) * 0.18);
+        const stepInterval = Math.max(0.08, 0.28 - (this.currentHorizontalSpeed / 30.0) * 0.18);
         if (this.stepSoundTimer > stepInterval) {
           sound.playStep();
           this.stepSoundTimer = 0;
-          if (this.currentHorizontalSpeed > 14.0) {
-            this.emitDustBurst(0.4); // Sprint dust trails!
+          if (this.currentHorizontalSpeed > 16.0) {
+            this.emitDustBurst(0.5); // Sprint dust trails!
           }
         }
       }
     } else {
-      const friction = this.isGrounded ? 9.0 : 2.5;
+      const friction = this.isGrounded ? 18.0 : 5.0; // High floor friction prevents slipping/sliding
       this.currentHorizontalSpeed = Math.max(0, this.currentHorizontalSpeed - friction * deltaTime);
-      this.velocity.x *= Math.max(0, 1 - friction * deltaTime * 0.5);
-      this.velocity.z *= Math.max(0, 1 - friction * deltaTime * 0.5);
+      this.velocity.x *= Math.max(0, 1 - friction * deltaTime * 0.8);
+      this.velocity.z *= Math.max(0, 1 - friction * deltaTime * 0.8);
       this.walkCycleTimer = 0;
-      this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0, deltaTime * 10.0);
+      this.mesh.rotation.z = THREE.MathUtils.lerp(this.mesh.rotation.z, 0, deltaTime * 12.0);
     }
 
-    // Apply Velocity with Collision Resolution
+    // Apply Velocity with Collision Resolution & High Ground Friction
     const nextX = this.position.x + this.velocity.x * deltaTime;
     const nextZ = this.position.z + this.velocity.z * deltaTime;
 
-    const maxIslandRadius = 34.0;
-    const distFromCenter = Math.hypot(nextX, nextZ);
-    if (distFromCenter > maxIslandRadius) {
-      const angle = Math.atan2(nextZ, nextX);
-      this.position.x = Math.cos(angle) * maxIslandRadius;
-      this.position.z = Math.sin(angle) * maxIslandRadius;
+    // State-based World Movement Boundary Constraints
+    const groundHeight = getGroundHeight(this.position.x, this.position.z);
+
+    // Dynamic World Movement Bounds
+    if (getGroundHeight(0, 0) > 0 && groundHeight < -1.0) {
+      // Off edge safety clamp (for water / abyss edges)
+      const distFromCenter = Math.hypot(nextX, nextZ);
+      if (distFromCenter > 220.0) {
+        const angle = Math.atan2(nextZ, nextX);
+        this.position.x = Math.cos(angle) * 220.0;
+        this.position.z = Math.sin(angle) * 220.0;
+      } else {
+        this.position.x = nextX;
+        this.position.z = nextZ;
+      }
     } else {
-      this.position.x = nextX;
-      this.position.z = nextZ;
+      // Wide curving track mode (Mystic Valley & Hub World) - Allow full 2500-unit track navigation
+      this.position.x = Math.max(-120.0, Math.min(120.0, nextX));
+      this.position.z = Math.max(-2520.0, Math.min(30.0, nextZ));
     }
 
-    // Waterfall Cliff Solid Wall in Garden World
-    if (this.position.z < -13.2 && Math.abs(this.position.x) < 6.5) {
+    // Waterfall Cliff Solid Wall ONLY in Garden World at the top waterfall cliff
+    if (this.position.z < -13.2 && this.position.z > -16.0 && Math.abs(this.position.x) < 3.5 && groundHeight > 4.0) {
       this.position.z = -13.2;
     }
 
     // ==========================================
-    // AGILITY JUMP PHYSICS & VARIABLE SPACEBAR JUMP
+    // STATE-BASED AGILITY JUMP PHYSICS SYSTEM (LAUNCH, APEX, FALL)
     // ==========================================
-    const groundHeight = getGroundHeight(this.position.x, this.position.z);
     const doJump = inputManager.consumeJump();
     const waterSurfaceY = 0.25;
 
@@ -968,41 +1152,45 @@ export class Player {
       this.position.y = THREE.MathUtils.lerp(this.position.y, waterSurfaceY + Math.sin(Date.now() * 0.005) * 0.08, deltaTime * 8);
       this.velocity.y = 0;
       this.isGrounded = true;
+      this.jumpPhase = 'NONE';
       this.canAirDash = true;
 
       if (doJump) {
-        this.velocity.y = 22.5; // High explosive leap out of the water!
+        this.velocity.y = 26.5; // High explosive leap out of the water!
         this.isGrounded = false;
         this.isSwimming = false;
         this.canAirDash = true;
-        this.squashStretch.set(0.75, 1.38, 0.75);
+        this.jumpPhase = 'LAUNCH';
+        this.squashStretch.set(0.70, 1.48, 0.70);
         sound.playSplash();
         this.emitDustBurst(1.5);
       }
     } else {
       this.isSwimming = false;
-      // Grounded High Sonic Jump
+      // Grounded High Arcade Jump Launch
       const standingY = groundHeight + 0.43;
 
       if (doJump && this.isGrounded) {
-        this.velocity.y = 22.5; // High, soaring, responsive launch!
+        this.velocity.y = 26.5; // High, snappy, soaring launch impulse!
         this.isGrounded = false;
+        this.jumpPhase = 'LAUNCH';
+        this.currentState = 'JUMP';
         this.canAirDash = true;
         this.isAirDashing = false;
         this.isHovering = false;
         this.hoverTimer = 0;
-        this.squashStretch.set(0.75, 1.38, 0.75); // Initial upward spring stretch
+        this.squashStretch.set(0.70, 1.48, 0.70); // Upward explosive spring stretch
         sound.playStep();
         this.emitDustBurst(1.4);
       }
-      // Mid-Air Sonic Air Dash / Homing Spin Attack!
+      // Mid-Air Air Dash / Homing Spin Attack
       else if (doJump && !this.isGrounded && this.canAirDash) {
         this.canAirDash = false;
         this.isAirDashing = true;
         this.isHovering = false;
         this.airDashTimer = 0.45;
 
-        // Scan for homing targets in sceneGroup (Eggs, Creatures, Enemies)
+        // Scan for homing targets in sceneGroup
         let homingTargetPos: THREE.Vector3 | null = null;
         let closestDist = 20.0;
 
@@ -1017,7 +1205,7 @@ export class Player {
             if (dist < closestDist) {
               const toTarget = worldPos.clone().sub(searchCenter).normalize();
               const dot = forwardDir.dot(toTarget);
-              if (dot > 0.25) { // Within forward view cone
+              if (dot > 0.25) {
                 closestDist = dist;
                 homingTargetPos = worldPos;
               }
@@ -1026,17 +1214,15 @@ export class Player {
         });
 
         if (homingTargetPos) {
-          // HOMING ATTACK: Rocket directly towards target!
           const attackDir = (homingTargetPos as THREE.Vector3).clone().sub(this.position).normalize();
           this.rotationY = Math.atan2(attackDir.x, attackDir.z);
           this.mesh.rotation.y = this.rotationY;
           this.velocity.x = attackDir.x * 36.0;
-          this.velocity.y = Math.max(10.0, attackDir.y * 36.0);
+          this.velocity.y = Math.max(12.0, attackDir.y * 36.0);
           this.velocity.z = attackDir.z * 36.0;
           this.currentHorizontalSpeed = 36.0;
           sound.playZap();
         } else {
-          // FORWARD AIR DASH: High momentum burst forward along input/movement vector or facing!
           const dashVector = isInputtingMove ? moveDir.clone() : new THREE.Vector3(Math.sin(this.rotationY), 0, Math.cos(this.rotationY));
           dashVector.normalize();
 
@@ -1044,12 +1230,13 @@ export class Player {
           this.mesh.rotation.y = this.rotationY;
 
           this.velocity.x = dashVector.x * 32.0;
-          this.velocity.y = Math.max(10.0, this.velocity.y + 8.5);
+          this.velocity.y = Math.max(12.0, this.velocity.y + 9.5);
           this.velocity.z = dashVector.z * 32.0;
           this.currentHorizontalSpeed = Math.max(32.0, this.currentHorizontalSpeed + 14.0);
           sound.playSpinAttackSound();
         }
 
+        this.jumpPhase = 'LAUNCH';
         this.emitDustBurst(2.0);
       }
 
@@ -1059,11 +1246,10 @@ export class Player {
       if (!this.isGrounded && isSpaceHeld && !this.isAirDashing && this.velocity.y <= 2.5 && this.hoverTimer < 3.2) {
         this.isHovering = true;
         this.hoverTimer += deltaTime;
-        this.velocity.y = Math.sin(Date.now() * 0.008) * 0.35; // Gentle floaty hover stream!
+        this.velocity.y = Math.sin(Date.now() * 0.008) * 0.35;
         this.hoverAuraLight.intensity = THREE.MathUtils.lerp(this.hoverAuraLight.intensity, 3.8, deltaTime * 8.0);
         this.hoverAuraLight.color.setHex((Date.now() % 400 > 200) ? 0x38bdf8 : 0xfde047);
 
-        // Upward hovering energy particles
         if (Math.random() < 0.4) {
           this.emitDustBurst(0.5);
         }
@@ -1071,19 +1257,30 @@ export class Player {
         this.isHovering = false;
         this.hoverAuraLight.intensity = THREE.MathUtils.lerp(this.hoverAuraLight.intensity, 0, deltaTime * 10.0);
 
-        // Variable Jump Height & Soaring Dynamic Gravity Curves
-        let gravity = 26.0;
-        if (this.velocity.y > 0) {
+        // State-Based Jump Phase Evaluation & Arcade Gravity Curves
+        let gravity = 32.0;
+
+        if (this.velocity.y > 3.5) {
+          // LAUNCH STATE: Fast responsive upward trajectory
+          this.jumpPhase = 'LAUNCH';
+          this.currentState = 'JUMP';
+
           if (isSpaceHeld) {
-            gravity = 14.0; // Floaty soaring climb while Space is held!
+            gravity = 22.0; // Sustained upward leap when spacebar is held
           } else {
-            this.velocity.y *= 0.80; // Variable jump height cut-off when tapped
-            gravity = 36.0;
+            this.velocity.y *= 0.82; // Immediate tap cut-off for precise jump control
+            gravity = 42.0;
           }
-        } else if (Math.abs(this.velocity.y) <= 4.0) {
-          gravity = isSpaceHeld ? 6.0 : 12.0; // Soaring Apex Hang-Time at peak!
+        } else if (Math.abs(this.velocity.y) <= 3.5) {
+          // APEX STATE: Snappy peak hang-time with enhanced air maneuverability
+          this.jumpPhase = 'APEX';
+          this.currentState = 'PEAK';
+          gravity = isSpaceHeld ? 10.0 : 18.0;
         } else {
-          gravity = isSpaceHeld ? 16.0 : 28.0; // Floaty parachuting glide when holding space while falling!
+          // FALL STATE: Fast non-floaty arcade fall gravity for crisp landing feel
+          this.jumpPhase = 'FALL';
+          this.currentState = 'FALL';
+          gravity = isSpaceHeld ? 24.0 : 48.0; // Snappy downward pull
         }
 
         this.velocity.y -= gravity * deltaTime;
@@ -1091,16 +1288,18 @@ export class Player {
 
       this.position.y += this.velocity.y * deltaTime;
 
+      // Solid Floor Collision & Ground Clamping to Prevent Clipping
       if (this.position.y <= standingY) {
         if (!this.isGrounded) {
-          // Springy landing compression + dust shockwave burst!
-          this.squashStretch.set(1.32, 0.68, 1.32);
+          // Springy landing compression + dust shockwave burst
+          this.squashStretch.set(1.35, 0.65, 1.35);
           this.emitDustBurst(1.2);
           sound.playStep();
         }
         this.position.y = standingY;
         this.velocity.y = 0;
         this.isGrounded = true;
+        this.jumpPhase = 'NONE';
         this.isAirDashing = false;
         this.isHovering = false;
         this.hoverTimer = 0;

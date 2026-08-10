@@ -43,6 +43,7 @@ export default function SolanderGamePage() {
   // State for Contextual Companion Interaction & Combat HUD
   const [showCompanionModal, setShowCompanionModal] = useState<boolean>(false);
   const [showStatsModal, setShowStatsModal] = useState<boolean>(false);
+  const [showStageSelectModal, setShowStageSelectModal] = useState<boolean>(false);
   const [combatInfo, setCombatInfo] = useState<CombatInfo>({
     inCombat: false,
     comboCount: 0,
@@ -154,7 +155,7 @@ export default function SolanderGamePage() {
   // Companion & Save state
   const [companion, setCompanion] = useState<SolanderCreatureData | null>(null);
   const [resources, setResources] = useState<PlayerResources>(DEFAULT_RESOURCES);
-  const [currentWorld, setCurrentWorld] = useState<'GARDEN' | 'MYSTIC_VALLEY'>('GARDEN');
+  const [currentWorld, setCurrentWorld] = useState<'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD'>('GARDEN');
   const [memories, setMemories] = useState<{ id: string; title: string; text: string; date: string }[]>([]);
 
   // Virtual Joystick touch state
@@ -190,7 +191,8 @@ export default function SolanderGamePage() {
       containerRef.current,
       (prompt) => setActivePrompt(prompt),
       (opacity) => setFadeOpacity(opacity),
-      (cState) => setCombatInfo(cState)
+      (cState) => setCombatInfo(cState),
+      (world) => setCurrentWorld(world)
     );
     sceneManagerRef.current = manager;
 
@@ -240,6 +242,11 @@ export default function SolanderGamePage() {
       sound.playChirp();
       return;
     }
+    if (activePrompt && activePrompt.targetId === 'portal_valley') {
+      setShowStageSelectModal(true);
+      sound.playChirp();
+      return;
+    }
     if (sceneManagerRef.current) {
       sceneManagerRef.current.handleInteractAction(
         () => setShowDestinationHubModal(true),
@@ -272,11 +279,11 @@ export default function SolanderGamePage() {
       <div className="relative z-10 flex flex-col justify-between h-full p-4 pointer-events-none">
         {/* Top Minimal Exploration HUD Bar */}
         <div className="flex items-center justify-between gap-3 pointer-events-auto">
-          {/* Left: World Pill & Radial Menu Button */}
+          {/* Left: World Pill & Radial Menu Button & Exit Stage Button */}
           <div className="flex items-center gap-2 bg-slate-950/85 backdrop-blur-md border border-cyan-500/40 rounded-full px-3 py-1.5 shadow-xl text-white">
             <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
               <Compass className="w-3.5 h-3.5 text-emerald-400" />
-              {currentWorld === 'GARDEN' ? '🏡 Solander Garden' : '⚔️ Mystic Valley'}
+              {currentWorld === 'GARDEN' ? '🏡 Solander Garden' : currentWorld === 'HUB_WORLD' ? '🏫 Chao World Hub' : '⚡ Mystic Valley'}
             </span>
             <div className="h-3 w-px bg-slate-800" />
             <button
@@ -291,6 +298,23 @@ export default function SolanderGamePage() {
               <span>MENU</span>
               <span className="bg-black/40 text-cyan-200 px-1 py-0.5 rounded font-mono text-[9px]">TAB</span>
             </button>
+
+            {currentWorld !== 'GARDEN' && (
+              <>
+                <div className="h-3 w-px bg-slate-800" />
+                <button
+                  onClick={() => {
+                    sceneManagerRef.current?.switchWorld('GARDEN');
+                    sound.playChirp();
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] py-1 px-3 rounded-full flex items-center gap-1.5 shadow-lg transition active:scale-95 border border-emerald-400/50 animate-pulse"
+                  title="Exit Stage & Return to Solander Garden"
+                >
+                  <span>🌸</span>
+                  <span>EXIT TO GARDEN</span>
+                </button>
+              </>
+            )}
           </div>
 
           {/* Center: Essential Resources Bar */}
@@ -898,45 +922,92 @@ export default function SolanderGamePage() {
             </div>
 
             {/* Companion Stats Bars */}
-            <div className="my-4 space-y-2.5 text-xs">
+            <div className="my-3 space-y-2 text-xs">
+              {/* Swim Stat Level & EXP Bar */}
               <div>
-                <div className="flex justify-between text-slate-300 font-medium mb-1">
-                  <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5 text-amber-400" /> Curiosity</span>
-                  <span className="font-mono text-amber-300">{companion.curiosity}/100</span>
+                <div className="flex justify-between text-slate-300 font-medium text-[11px] mb-0.5">
+                  <span className="flex items-center gap-1 font-bold text-sky-300">🌊 Swim Lv.{(companion as any).swimLv || 1}</span>
+                  <span className="font-mono text-slate-400">Stat: {companion.swimStat || 10} | EXP: {(companion as any).swimExp || 0}/100</span>
                 </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-amber-400 h-full transition-all duration-300" style={{ width: `${companion.curiosity}%` }} />
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                  <div className="bg-sky-400 h-full transition-all duration-300" style={{ width: `${(companion as any).swimExp || 0}%` }} />
                 </div>
               </div>
 
+              {/* Fly Stat Level & EXP Bar */}
               <div>
-                <div className="flex justify-between text-slate-300 font-medium mb-1">
-                  <span className="flex items-center gap-1"><Shield className="w-3.5 h-3.5 text-indigo-400" /> Bravery</span>
-                  <span className="font-mono text-indigo-300">{companion.bravery}/100</span>
+                <div className="flex justify-between text-slate-300 font-medium text-[11px] mb-0.5">
+                  <span className="flex items-center gap-1 font-bold text-indigo-300">🪽 Fly Lv.{(companion as any).flyLv || 1}</span>
+                  <span className="font-mono text-slate-400">Stat: {companion.flyStat || 10} | EXP: {(companion as any).flyExp || 0}/100</span>
                 </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-indigo-500 h-full transition-all duration-300" style={{ width: `${companion.bravery}%` }} />
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                  <div className="bg-indigo-400 h-full transition-all duration-300" style={{ width: `${(companion as any).flyExp || 0}%` }} />
                 </div>
               </div>
 
+              {/* Run Stat Level & EXP Bar */}
               <div>
-                <div className="flex justify-between text-slate-300 font-medium mb-1">
-                  <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5 text-sky-400" /> Energy</span>
-                  <span className="font-mono text-sky-300">{companion.energy}/100</span>
+                <div className="flex justify-between text-slate-300 font-medium text-[11px] mb-0.5">
+                  <span className="flex items-center gap-1 font-bold text-emerald-300">🏃 Run Lv.{(companion as any).runLv || 1}</span>
+                  <span className="font-mono text-slate-400">Stat: {companion.runStat || 10} | EXP: {(companion as any).runExp || 0}/100</span>
                 </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-sky-400 h-full transition-all duration-300" style={{ width: `${companion.energy}%` }} />
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                  <div className="bg-emerald-400 h-full transition-all duration-300" style={{ width: `${(companion as any).runExp || 0}%` }} />
                 </div>
               </div>
 
+              {/* Power Stat Level & EXP Bar */}
               <div>
-                <div className="flex justify-between text-slate-300 font-medium mb-1">
-                  <span className="flex items-center gap-1"><Flame className="w-3.5 h-3.5 text-rose-400" /> Creativity</span>
-                  <span className="font-mono text-rose-300">{companion.creativity}/100</span>
+                <div className="flex justify-between text-slate-300 font-medium text-[11px] mb-0.5">
+                  <span className="flex items-center gap-1 font-bold text-rose-300">💪 Power Lv.{(companion as any).powerLv || 1}</span>
+                  <span className="font-mono text-slate-400">Stat: {companion.powerStat || 10} | EXP: {(companion as any).powerExp || 0}/100</span>
                 </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                  <div className="bg-rose-400 h-full transition-all duration-300" style={{ width: `${companion.creativity}%` }} />
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                  <div className="bg-rose-400 h-full transition-all duration-300" style={{ width: `${(companion as any).powerExp || 0}%` }} />
                 </div>
+              </div>
+
+              {/* Stamina Stat Level & EXP Bar */}
+              <div>
+                <div className="flex justify-between text-slate-300 font-medium text-[11px] mb-0.5">
+                  <span className="flex items-center gap-1 font-bold text-amber-300">⚡ Stamina Lv.{(companion as any).staminaLv || 1}</span>
+                  <span className="font-mono text-slate-400">Stat: {companion.staminaStat || 10} | EXP: {(companion as any).staminaExp || 0}/100</span>
+                </div>
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700">
+                  <div className="bg-amber-400 h-full transition-all duration-300" style={{ width: `${(companion as any).staminaExp || 0}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Accessories Wardrobe */}
+            <div className="mb-3">
+              <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-400" /> Equip Chao Accessory
+              </h4>
+              <div className="flex gap-2">
+                {[
+                  { id: null, label: 'None', icon: '❌' },
+                  { id: 'halo', label: 'Halo', icon: '😇' },
+                  { id: 'crown', label: 'Crown', icon: '👑' },
+                  { id: 'bowtie', label: 'Bowtie', icon: '🎀' },
+                  { id: 'glasses', label: 'Glasses', icon: '🕶️' }
+                ].map((acc) => (
+                  <button
+                    key={acc.label}
+                    onClick={() => {
+                      if (companion) saveSystem.equipAccessory(companion.id, acc.id);
+                      sound.playChirp();
+                    }}
+                    className={`flex-1 py-1.5 rounded-xl border text-center text-xs transition ${
+                      companion?.activeAccessory === acc.id
+                        ? 'bg-sky-500/30 border-sky-400 text-sky-200 font-bold ring-2 ring-sky-400/50'
+                        : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span className="block text-sm">{acc.icon}</span>
+                    <span className="text-[9px] block">{acc.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1398,25 +1469,137 @@ export default function SolanderGamePage() {
                 <ChevronRight className="w-5 h-5 text-sky-400" />
               </button>
 
-              <button
-                onClick={() => {
-                  setShowDestinationHubModal(false);
-                  if (sceneManagerRef.current) {
-                    sceneManagerRef.current.switchWorld(currentWorld === 'GARDEN' ? 'MYSTIC_VALLEY' : 'GARDEN');
-                  }
-                  sound.playTeleport();
-                }}
-                className="w-full bg-emerald-900/80 hover:bg-emerald-800 border border-emerald-500/50 p-3 rounded-2xl flex items-center justify-between text-left transition"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🌄</span>
+              <div className="pt-2 border-t border-slate-800 font-mono text-[10px] uppercase text-cyan-400 font-black tracking-widest">
+                Warp Gates
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => {
+                    setShowDestinationHubModal(false);
+                    if (sceneManagerRef.current) sceneManagerRef.current.switchWorld('GARDEN');
+                    sound.playTeleport();
+                  }}
+                  className={`p-2.5 rounded-2xl border text-center transition flex flex-col items-center gap-1 ${currentWorld === 'GARDEN' ? 'bg-emerald-600 border-emerald-300 text-white' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'}`}
+                >
+                  <span className="text-xl">🌸</span>
+                  <span className="text-[10px] font-bold">Garden</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowDestinationHubModal(false);
+                    if (sceneManagerRef.current) sceneManagerRef.current.switchWorld('HUB_WORLD');
+                    sound.playTeleport();
+                  }}
+                  className={`p-2.5 rounded-2xl border text-center transition flex flex-col items-center gap-1 ${currentWorld === 'HUB_WORLD' ? 'bg-purple-600 border-purple-300 text-white' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'}`}
+                >
+                  <span className="text-xl">🏫</span>
+                  <span className="text-[10px] font-bold">Chao Hub</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowDestinationHubModal(false);
+                    if (sceneManagerRef.current) sceneManagerRef.current.switchWorld('MYSTIC_VALLEY');
+                    sound.playTeleport();
+                  }}
+                  className={`p-2.5 rounded-2xl border text-center transition flex flex-col items-center gap-1 ${currentWorld === 'MYSTIC_VALLEY' ? 'bg-amber-600 border-amber-300 text-white' : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200'}`}
+                >
+                  <span className="text-xl">⚡</span>
+                  <span className="text-[10px] font-bold">Adventure</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. ADVENTURE MODE STAGE SELECT MODAL */}
+      {showStageSelectModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in zoom-in duration-200">
+          <div className="bg-slate-900 border-2 border-cyan-400/80 rounded-3xl p-6 max-w-xl w-full shadow-2xl text-white relative">
+            <button
+              onClick={() => setShowStageSelectModal(false)}
+              className="absolute top-4 right-4 bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-full transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-800">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-2xl">
+                ⚡
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-cyan-300 tracking-wide">ADVENTURE STAGE SELECT</h2>
+                <p className="text-xs text-slate-400">Choose your high-speed Sonic course layout</p>
+              </div>
+            </div>
+
+            <div className="my-5 space-y-4">
+              {/* STAGE 1: TRON CYBER HIGHWAY */}
+              <div className="bg-slate-950 border border-cyan-500/40 rounded-2xl p-4 relative overflow-hidden group hover:border-cyan-400 transition shadow-lg">
+                <div className="flex justify-between items-start mb-2">
                   <div>
-                    <h4 className="font-bold text-sm text-emerald-200">{currentWorld === 'GARDEN' ? 'Travel to Mystic Valley' : 'Return to Solander Garden'}</h4>
-                    <p className="text-[11px] text-emerald-300/80">Warp directly to the ancient valley</p>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-cyan-400 bg-cyan-950 px-2.5 py-0.5 rounded-full border border-cyan-500/50">
+                      STAGE 01
+                    </span>
+                    <h3 className="text-lg font-black text-white mt-1">TRON CYBER HIGHWAY</h3>
                   </div>
+                  <span className="text-2xl">🌐</span>
                 </div>
-                <ChevronRight className="w-5 h-5 text-emerald-400" />
-              </button>
+                <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+                  Neon grid tracks with dual forks (Left/Right & Short/Long), dash boost pads, spring coils, and speed rings.
+                </p>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[11px] font-mono text-cyan-300">
+                  <span>Track Length: 1,800 Units</span>
+                  <span>Forks: 2 Split Paths</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowStageSelectModal(false);
+                    if (sceneManagerRef.current) {
+                      sceneManagerRef.current.switchWorld('MYSTIC_VALLEY', 'TRON');
+                    }
+                    sound.playTeleport();
+                  }}
+                  className="w-full mt-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-md"
+                >
+                  Enter Stage 1: Tron Highway
+                </button>
+              </div>
+
+              {/* STAGE 2: MYSTIC VALLEY CANYON */}
+              <div className="bg-slate-950 border border-purple-500/40 rounded-2xl p-4 relative overflow-hidden group hover:border-purple-400 transition shadow-lg">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 bg-purple-950 px-2.5 py-0.5 rounded-full border border-purple-500/50">
+                      STAGE 02
+                    </span>
+                    <h3 className="text-lg font-black text-white mt-1">MYSTIC VALLEY CANYON</h3>
+                  </div>
+                  <span className="text-2xl">⛰️</span>
+                </div>
+                <p className="text-xs text-slate-300 mb-3 leading-relaxed">
+                  The original 2,500-unit serpentine canyon mountain run with bioluminescent crystal trees and winding curves.
+                </p>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[11px] font-mono text-purple-300">
+                  <span>Track Length: 2,500 Units</span>
+                  <span>Path: Winding Serpentine</span>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowStageSelectModal(false);
+                    if (sceneManagerRef.current) {
+                      sceneManagerRef.current.switchWorld('MYSTIC_VALLEY', 'ORIGINAL');
+                    }
+                    sound.playTeleport();
+                  }}
+                  className="w-full mt-3 bg-purple-600 hover:bg-purple-500 text-white font-black py-2.5 rounded-xl text-xs uppercase tracking-wider transition shadow-md"
+                >
+                  Enter Stage 2: Mystic Canyon
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { saveSystem } from './save';
 import { sound } from './audio';
 
 export interface ActivePrompt {
-  type: 'EGG' | 'COMPANION' | 'PORTAL' | 'DISCOVERY' | 'RESOURCE' | 'TRIAL';
+  type: 'EGG' | 'COMPANION' | 'PORTAL' | 'DISCOVERY' | 'RESOURCE' | 'TRIAL' | 'SHOP' | 'SCHOOL';
   title: string;
   subtitle: string;
   actionText: string;
@@ -25,21 +25,22 @@ export class InteractionManager {
     mysticValley: MysticValleyWorld,
     portalToValley: PortalCave,
     portalToGarden: PortalCave,
+    portalToHub: PortalCave | null,
     companionCreature: SolanderCreature | null,
     allCreatures: SolanderCreature[],
-    currentWorld: 'GARDEN' | 'MYSTIC_VALLEY'
+    currentWorld: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD'
   ): ActivePrompt | null {
     const playerPos = player.position;
     this.currentPrompt = null;
 
     if (currentWorld === 'GARDEN') {
-      // 1. Check Cave Portal Trigger
-      const distToCave = portalToValley.position.distanceTo(playerPos);
-      if (distToCave < 4.2) {
+      // 1. Check Adventure Mode Cave Portal Trigger
+      const distToValley = portalToValley.position.distanceTo(playerPos);
+      if (distToValley < 4.2) {
         this.currentPrompt = {
           type: 'PORTAL',
           title: '⚡ ADVENTURE MODE PORTAL ⚡',
-          subtitle: 'Gateway to Mystic Valley Adventure Mode & Quests',
+          subtitle: 'Gateway to Sonic-style Mystic Valley Course & Action Quests',
           actionText: 'Enter Adventure Mode',
           targetId: 'portal_valley',
           position: portalToValley.position
@@ -47,7 +48,23 @@ export class InteractionManager {
         return this.currentPrompt;
       }
 
-      // 2. Check Eggs
+      // 2. Check Chao World Hub Portal Trigger
+      if (portalToHub) {
+        const distToHub = portalToHub.position.distanceTo(playerPos);
+        if (distToHub < 4.2) {
+          this.currentPrompt = {
+            type: 'PORTAL',
+            title: '🏫 CHAO WORLD HUB PORTAL 🏫',
+            subtitle: 'Gateway to Chao Item Shop, Kindergarten School & Dojo',
+            actionText: 'Enter Chao Hub',
+            targetId: 'portal_hub',
+            position: portalToHub.position
+          };
+          return this.currentPrompt;
+        }
+      }
+
+      // 3. Check Eggs
       for (const egg of garden.eggs) {
         if (!egg.hatched) {
           const dist = egg.mesh.position.distanceTo(playerPos);
@@ -65,15 +82,74 @@ export class InteractionManager {
           }
         }
       }
+    } else if (currentWorld === 'HUB_WORLD') {
+      // 1. Check Return Portals in Hub
+      if (portalToGarden) {
+        const dist = portalToGarden.position.distanceTo(playerPos);
+        if (dist < 3.8) {
+          this.currentPrompt = {
+            type: 'PORTAL',
+            title: '🌸 SOLANDER GARDEN 🌸',
+            subtitle: 'Return to the main peaceful sanctuary garden',
+            actionText: 'Return to Garden',
+            targetId: 'portal_garden',
+            position: portalToGarden.position
+          };
+          return this.currentPrompt;
+        }
+      }
+
+      if (portalToValley) {
+        const dist = portalToValley.position.distanceTo(playerPos);
+        if (dist < 4.2) {
+          this.currentPrompt = {
+            type: 'PORTAL',
+            title: '⚡ ADVENTURE STAGE SELECT ⚡',
+            subtitle: 'Enter Left Mountain Cave to choose Adventure Stage',
+            actionText: 'Open Stage Select',
+            targetId: 'portal_valley',
+            position: portalToValley.position
+          };
+          return this.currentPrompt;
+        }
+      }
+
+      // 2. Check Item Shop Counter
+      const shopPos = new THREE.Vector3(-18, 0, -6.8);
+      if (playerPos.distanceTo(shopPos) < 4.5) {
+        this.currentPrompt = {
+          type: 'SHOP',
+          title: '🛍️ CHAO ITEM SHOP',
+          subtitle: 'Buy rare fruits, seeds, toy balls, and accessories',
+          actionText: 'Open Item Shop',
+          targetId: 'chao_shop',
+          position: shopPos
+        };
+        return this.currentPrompt;
+      }
+
+      // 3. Check School Desk
+      const schoolPos = new THREE.Vector3(18, 0, -6.4);
+      if (playerPos.distanceTo(schoolPos) < 4.5) {
+        this.currentPrompt = {
+          type: 'SCHOOL',
+          title: '🏫 CHAO KINDERGARTEN & LESSONS',
+          subtitle: 'Enroll Chao in Music, Drawing, Dance, & Martial Arts classes',
+          actionText: 'Enter Kindergarten',
+          targetId: 'chao_school',
+          position: schoolPos
+        };
+        return this.currentPrompt;
+      }
     } else {
       // MYSTIC VALLEY
       // 1. Check Portal back to Garden
       const distToReturn = portalToGarden.position.distanceTo(playerPos);
-      if (distToReturn < 3.2) {
+      if (distToReturn < 5.0) {
         this.currentPrompt = {
           type: 'PORTAL',
-          title: 'Garden Portal',
-          subtitle: 'Return to the serene Solander Garden',
+          title: '🌸 Garden Portal',
+          subtitle: 'Return to Solander Garden',
           actionText: 'Return to Garden',
           targetId: 'portal_garden',
           position: portalToGarden.position
@@ -171,7 +247,7 @@ export class InteractionManager {
     garden: SolanderGardenWorld,
     mysticValley: MysticValleyWorld,
     allCreatures: SolanderCreature[],
-    onWorldSwitch: (targetWorld: 'GARDEN' | 'MYSTIC_VALLEY') => void,
+    onWorldSwitch: (targetWorld: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD') => void,
     onOpenDestinationHub?: () => void,
     onInspectChao?: (creatureId: string) => void
   ) {
@@ -184,6 +260,20 @@ export class InteractionManager {
         const creatureName = egg.name.replace(' Egg', '');
         saveSystem.hatchEgg(egg.id, creatureName);
         saveSystem.setMessage(`✨ ${creatureName} hatched from the glowing egg! ${creatureName} is now your companion.`);
+      }
+    } else if (prompt.type === 'SHOP') {
+      sound.playHatchChime();
+      if (onOpenDestinationHub) {
+        onOpenDestinationHub();
+      } else {
+        saveSystem.setMessage('🛍️ Chao Item Shop Counter: Purchased +3 Solander Fruits & +1 Star Seed!');
+      }
+    } else if (prompt.type === 'SCHOOL') {
+      sound.playMemorySound();
+      if (onOpenDestinationHub) {
+        onOpenDestinationHub();
+      } else {
+        saveSystem.setMessage('🏫 Chao Kindergarten: Chao finished Music & Dance lessons! Stats boosted!');
       }
     } else if (prompt.type === 'RESOURCE') {
       const resNode = mysticValley.resourceNodes.find(r => r.id === prompt.targetId);
@@ -218,15 +308,12 @@ export class InteractionManager {
         }
       }
     } else if (prompt.type === 'PORTAL') {
+      sound.playTeleport();
       if (prompt.targetId === 'portal_valley') {
-        sound.playTeleport();
-        if (onOpenDestinationHub) {
-          onOpenDestinationHub();
-        } else {
-          onWorldSwitch('MYSTIC_VALLEY');
-        }
+        onWorldSwitch('MYSTIC_VALLEY');
+      } else if (prompt.targetId === 'portal_hub') {
+        onWorldSwitch('HUB_WORLD');
       } else {
-        sound.playTeleport();
         onWorldSwitch('GARDEN');
       }
     } else if (prompt.type === 'DISCOVERY') {

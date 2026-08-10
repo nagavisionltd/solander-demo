@@ -29,6 +29,9 @@ export class SolanderGardenWorld {
   private fireflies!: THREE.Points;
   private airborneSpores!: THREE.Points;
   private mistPuffs: THREE.Mesh[] = [];
+  private waterfallMistParticles!: THREE.Points;
+  private waterfallMistLight1!: THREE.PointLight;
+  private waterfallMistLight2!: THREE.PointLight;
   private godRays: THREE.Mesh[] = [];
   public waterMesh!: THREE.Mesh;
   public smallWaterMesh!: THREE.Mesh;
@@ -72,14 +75,68 @@ export class SolanderGardenWorld {
   }
 
   private buildEtherealAtmosphere() {
-    // 1. WATERFALL MIST PARTICLES SYSTEM
+    // 1. VOLUMETRIC MIST PARTICLE SYSTEM AT WATERFALL BASE
+    const mistCount = 180;
+    const mistGeo = new THREE.BufferGeometry();
+    const mistPos = new Float32Array(mistCount * 3);
+    const mistScales = new Float32Array(mistCount);
+
+    for (let i = 0; i < mistCount; i++) {
+      const idx = i * 3;
+      mistPos[idx] = (Math.random() - 0.5) * 5.8; // Spans width of waterfall base
+      mistPos[idx + 1] = 0.1 + Math.random() * 3.6; // Vertical mist column
+      mistPos[idx + 2] = -13.0 + (Math.random() - 0.5) * 3.2; // Base splash zone
+      mistScales[i] = 0.6 + Math.random() * 0.9;
+    }
+
+    mistGeo.setAttribute('position', new THREE.BufferAttribute(mistPos, 3));
+
+    // Soft particle canvas texture for volumetric glow
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+      grad.addColorStop(0.35, 'rgba(186, 230, 253, 0.75)');
+      grad.addColorStop(0.7, 'rgba(56, 189, 248, 0.25)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+    }
+    const softParticleTex = new THREE.CanvasTexture(canvas);
+
+    const mistMat = new THREE.PointsMaterial({
+      color: 0xe0f2fe,
+      size: 0.88,
+      map: softParticleTex,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    this.waterfallMistParticles = new THREE.Points(mistGeo, mistMat);
+    this.group.add(this.waterfallMistParticles);
+
+    // Interactive Celestial Point Lights at Base of Waterfall
+    this.waterfallMistLight1 = new THREE.PointLight(0x38bdf8, 0.8, 12.0);
+    this.waterfallMistLight1.position.set(0, 1.4, -12.8);
+    this.group.add(this.waterfallMistLight1);
+
+    this.waterfallMistLight2 = new THREE.PointLight(0xfef08a, 0.5, 9.0);
+    this.waterfallMistLight2.position.set(-2.0, 2.0, -13.2);
+    this.group.add(this.waterfallMistLight2);
+
+    // Billowing Mist Mesh Puffs
     const puffGeo = new THREE.SphereGeometry(0.75, 12, 12);
     const puffMat = new THREE.MeshStandardMaterial({
       color: 0xe0f2fe,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 0.4,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.1,
       transparent: true,
-      opacity: 0.38,
+      opacity: 0.2,
       depthWrite: false
     });
 
@@ -100,23 +157,25 @@ export class SolanderGardenWorld {
       this.mistPuffs.push(puff);
     }
 
-    // 2. VOLUMETRIC GOD RAYS / SKY LIGHT SHAFTS (Sky: Children of the Light Style)
-    const rayGeo = new THREE.CylinderGeometry(0.3, 3.2, 22, 16, 1, true);
+    // 2. VOLUMETRIC GOD RAYS / SKY LIGHT SHAFTS
+    const rayGeo = new THREE.CylinderGeometry(0.8, 11.0, 42, 16, 1, true);
     const rayMat = new THREE.MeshBasicMaterial({
-      color: 0xfef08a,
+      color: 0xfef3c7,
       transparent: true,
-      opacity: 0.24,
+      opacity: 0.02,
       side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       depthWrite: false
     });
 
     const rayPositions = [
-      { x: 0, y: 7.5, z: -12.2, rx: 0.1, rz: -0.05 },
-      { x: -2.8, y: 7.0, z: -9.5, rx: 0.14, rz: 0.12 },
-      { x: 2.8, y: 7.2, z: -10.2, rx: 0.08, rz: -0.14 },
-      { x: 6.5, y: 6.8, z: -5.5, rx: 0.18, rz: -0.16 },
-      { x: -6.5, y: 6.8, z: -4.5, rx: 0.16, rz: 0.18 }
+      { x: 0, y: 22.0, z: -12.2, rx: 0.12, rz: -0.05 },
+      { x: -14.0, y: 22.0, z: -18.5, rx: 0.14, rz: 0.12 },
+      { x: 14.0, y: 22.0, z: -16.2, rx: 0.08, rz: -0.14 },
+      { x: 22.0, y: 20.0, z: 12.5, rx: 0.18, rz: -0.16 },
+      { x: -22.0, y: 20.0, z: 14.5, rx: 0.16, rz: 0.18 },
+      { x: -8.5, y: 24.0, z: 22.0, rx: 0.10, rz: -0.10 },
+      { x: 10.5, y: 24.0, z: 24.0, rx: -0.10, rz: 0.12 }
     ];
 
     rayPositions.forEach((rp, idx) => {
@@ -128,22 +187,22 @@ export class SolanderGardenWorld {
       this.godRays.push(ray);
     });
 
-    // 3. AIRBORNE LIGHT SPORES / DANDELION SEEDS (Sky: Children of the Light Style)
-    const sporeCount = 120;
+    // 3. AIRBORNE LIGHT SPORES & FAIRY WISPS (Sky / Zelda Lost Woods Style)
+    const sporeCount = 200;
     const sporeGeo = new THREE.BufferGeometry();
     const sporePos = new Float32Array(sporeCount * 3);
     for (let i = 0; i < sporeCount * 3; i += 3) {
-      sporePos[i] = (Math.random() - 0.5) * 50;
-      sporePos[i + 1] = 0.2 + Math.random() * 8.0;
-      sporePos[i + 2] = (Math.random() - 0.5) * 50;
+      sporePos[i] = (Math.random() - 0.5) * 100;
+      sporePos[i + 1] = 0.2 + Math.random() * 12.0;
+      sporePos[i + 2] = (Math.random() - 0.5) * 100;
     }
     sporeGeo.setAttribute('position', new THREE.BufferAttribute(sporePos, 3));
 
     const sporeMat = new THREE.PointsMaterial({
-      color: 0xfef08a,
-      size: 0.22,
+      color: 0xa7f3d0,
+      size: 0.28,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.75,
       blending: THREE.AdditiveBlending
     });
     this.airborneSpores = new THREE.Points(sporeGeo, sporeMat);
@@ -158,9 +217,9 @@ export class SolanderGardenWorld {
 
   public getGroundHeight(x: number, z: number): number {
     const d = Math.hypot(x, z);
-    if (d > 28) return -2.0; // Boundary drop
+    if (d > 230) return -2.0; // Boundary cliff drop into sea
 
-    // Winding Stone Stair Platforms to top of Waterfall Cliff (Right side x: 3.5 to 6.5, z: -10 to -16)
+    // Winding Stone Stair Platforms to top of Waterfall Cliff
     if (x >= 3.0 && x <= 6.8 && z <= -10.0 && z >= -16.0) {
       if (z > -11.2) return 0.8;
       if (z > -12.6) return 1.6;
@@ -169,36 +228,45 @@ export class SolanderGardenWorld {
       return 4.6; // Top Stair Ledge
     }
 
-    // Top Waterfall Lookout Ledge (z <= -14.8, x between -3 and 3)
+    // Top Waterfall Lookout Ledge
     if (z <= -14.8 && Math.abs(x) < 3.5) {
       return 4.8;
     }
 
-    // Central Waterfall Swimming Lake (Expanded Center)
+    // Central Waterfall Swimming Lake - Deep Pool (2.5x - 3x deeper!)
     const distToPool = Math.hypot(x - this.poolCenter.x, z - this.poolCenter.z);
     if (distToPool < this.poolRadius) {
-      return -0.9 - (this.poolRadius - distToPool) * 0.08; // Deep underwater lake bed!
+      return -2.8 - (this.poolRadius - distToPool) * 0.12;
     }
 
     // East Garden Tranquil Lotus Pool
     const distToSmallPool = Math.hypot(x - this.smallPoolCenter.x, z - this.smallPoolCenter.z);
     if (distToSmallPool < this.smallPoolRadius) {
-      return -0.7 - (this.smallPoolRadius - distToSmallPool) * 0.08; // Small pool bed!
+      return -1.8 - (this.smallPoolRadius - distToSmallPool) * 0.1;
     }
 
-    // Waterfall Cliff behind pool (z < -13.5)
+    // Waterfall Cliff behind pool
     if (z < -13.5 && Math.abs(x) < 7) {
-      return 4.5 + ( -13.5 - z ) * 0.8;
+      return 4.5 + (-13.5 - z) * 0.8;
     }
 
-    const h1 = Math.sin(x * 0.15) * Math.cos(z * 0.15) * 0.5;
-    const h2 = Math.sin(x * 0.3 + z * 0.2) * 0.3;
+    // Left Cavern Cliff Wall (Adventure Cave Opening on Left of Map)
+    if (x <= -18.0 && x >= -38.0 && z >= 2.0 && z <= 18.0) {
+      const distToCaveEntrance = Math.hypot(x - (-24.0), z - 10.0);
+      if (distToCaveEntrance <= 4.2) {
+        return 0.1; // Smooth cavern entrance threshold
+      }
+      return Math.min(8.5, 1.8 + Math.pow(Math.abs(x - (-24.0)) * 0.45, 1.8));
+    }
+
+    const h1 = Math.sin(x * 0.04) * Math.cos(z * 0.04) * 1.5;
+    const h2 = Math.sin(x * 0.09 + z * 0.06) * 0.6;
     return Math.max(0, h1 + h2);
   }
 
   private buildTerrain() {
-    // Ground Mesh
-    const geo = new THREE.PlaneGeometry(60, 60, 64, 64);
+    // Ground Mesh - Expanded 480x480 for massive exploration (4x area!)
+    const geo = new THREE.PlaneGeometry(480, 480, 160, 160);
     geo.rotateX(-Math.PI / 2);
 
     const pos = geo.attributes.position;
@@ -955,6 +1023,34 @@ export class SolanderGardenWorld {
     // Animate pool water surface pulse
     if (this.waterMesh) {
       this.waterMesh.position.y = this.poolCenter.y + Math.sin(time * 2) * 0.03;
+    }
+
+    // Animate Volumetric Waterfall Mist Particle Cloud & Light Glow Interaction
+    if (this.waterfallMistParticles) {
+      const pos = this.waterfallMistParticles.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        let y = pos.getY(i) + (0.008 + (i % 5) * 0.002);
+        let x = pos.getX(i) + Math.sin(time * 2.2 + i * 0.8) * 0.006;
+        let z = pos.getZ(i) + Math.cos(time * 1.8 + i * 0.5) * 0.005;
+
+        if (y > 4.2) {
+          y = 0.1;
+          x = (Math.random() - 0.5) * 5.8;
+          z = -13.0 + (Math.random() - 0.5) * 3.2;
+        }
+
+        pos.setY(i, y);
+        pos.setX(i, x);
+        pos.setZ(i, z);
+      }
+      pos.needsUpdate = true;
+    }
+
+    if (this.waterfallMistLight1) {
+      this.waterfallMistLight1.intensity = 3.6 + Math.sin(time * 2.8) * 0.9;
+    }
+    if (this.waterfallMistLight2) {
+      this.waterfallMistLight2.intensity = 2.6 + Math.cos(time * 2.2) * 0.7;
     }
 
     // Animate Waterfall Mist Puffs

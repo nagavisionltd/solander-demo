@@ -30,397 +30,539 @@ export interface VoidEnemy {
   eyeMesh: THREE.Mesh;
 }
 
+export interface DashPanel {
+  id: string;
+  position: THREE.Vector3;
+  directionAngle: number;
+  mesh: THREE.Group;
+  cooldowned: boolean;
+}
+
+export interface SpringPad {
+  id: string;
+  position: THREE.Vector3;
+  upwardForce: number;
+  forwardSpeed: number;
+  mesh: THREE.Group;
+  cooldowned: boolean;
+}
+
+export interface SpeedRing {
+  id: string;
+  position: THREE.Vector3;
+  collected: boolean;
+  mesh: THREE.Group;
+}
+
 export class MysticValleyWorld {
   public group: THREE.Group;
   public discoveryPoints: DiscoveryPoint[] = [];
   public resourceNodes: ResourceNode[] = [];
   public enemies: VoidEnemy[] = [];
+  public dashPanels: DashPanel[] = [];
+  public springPads: SpringPad[] = [];
+  public speedRings: SpeedRing[] = [];
+  public checkpoint: { position: THREE.Vector3; mesh: THREE.Group; activated: boolean } | null = null;
+  public goalRing: { position: THREE.Vector3; mesh: THREE.Group; activated: boolean } | null = null;
   public trialPedestal: { position: THREE.Vector3; mesh: THREE.Group } | null = null;
-  private floatingCrystals: THREE.Mesh[] = [];
+
+  public activeStage: 'TRON' | 'ORIGINAL' = 'TRON';
 
   constructor() {
     this.group = new THREE.Group();
+    this.loadStage('TRON');
+  }
 
-    // Build Mystic Environment
-    this.buildTerrain();
-    this.buildMountains();
-    this.buildBioluminescentFlora();
+  public loadStage(stage: 'TRON' | 'ORIGINAL') {
+    this.activeStage = stage;
+    while (this.group.children.length > 0) {
+      this.group.remove(this.group.children[0]);
+    }
+    this.discoveryPoints = [];
+    this.resourceNodes = [];
+    this.enemies = [];
+    this.dashPanels = [];
+    this.springPads = [];
+    this.speedRings = [];
+    this.checkpoint = null;
+    this.goalRing = null;
+    this.trialPedestal = null;
+
+    if (stage === 'TRON') {
+      this.buildTronTrackGeometry();
+      this.buildTronSceneryAndArches();
+    } else {
+      this.buildOriginalValleyTerrain();
+      this.buildOriginalValleyScenery();
+    }
+
     this.buildDiscoveryPoints();
     this.buildResourceNodes();
     this.buildTrialPedestal();
     this.spawnVoidEnemies();
+    this.buildSonicCourse();
   }
 
+  /**
+   * Calculates ground height at any (X, Z) coordinate based on active level stage.
+   */
   public getGroundHeight(x: number, z: number): number {
-    const d = Math.hypot(x, z);
-    if (d > 36) return -2.0;
-
-    // Dedicated Downhill Momentum Slope Section (x between -10 and 10, z between -28 and 5)
-    if (Math.abs(x) < 12 && z > -28 && z < 5) {
-      const slopeFactor = (-z / 28.0) * 8.5; // High steep hill going down towards z = 5!
-      return Math.max(0, slopeFactor + Math.sin(x * 0.3) * 0.4);
+    if (this.activeStage === 'ORIGINAL') {
+      if (z > 30 || z < -2520) return -10.0;
+      const dist = Math.max(0, -z);
+      const centerX = Math.sin(dist * 0.008) * 45.0 + Math.sin(dist * 0.02) * 20.0;
+      const centerY = Math.sin(dist * 0.006) * 12.0 + Math.cos(dist * 0.015) * 6.0;
+      const distFromCenter = Math.abs(x - centerX);
+      if (distFromCenter <= 35.0) return centerY;
+      return -10.0;
     }
 
-    // Valley terrain with central plateau and surrounding ridges
-    const h1 = Math.sin(x * 0.1) * Math.cos(z * 0.1) * 1.2;
-    const h2 = Math.cos(x * 0.2 + z * 0.15) * 0.6;
-    return Math.max(0, h1 + h2);
-  }
+    // TRON STAGE OVERHEAD LAYOUT
+    if (z > 30 || z < -1820) return -10.0;
 
-  private buildTerrain() {
-    const geo = new THREE.PlaneGeometry(75, 75, 80, 80);
-    geo.rotateX(-Math.PI / 2);
-
-    const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
-      pos.setY(i, this.getGroundHeight(x, z));
+    // 1. START TRACK (z: 30 -> -220, centered at X = 0)
+    if (z <= 30 && z > -220) {
+      const distFromCenter = Math.abs(x - 0);
+      if (distFromCenter <= 18.0) return 0.0;
     }
-    geo.computeVertexNormals();
 
-    // Mystic Violet/Slate Terrain
-    const mat = new THREE.MeshToonMaterial({ color: 0x3b0764 }); // Deep purple slate
-    const terrain = new THREE.Mesh(geo, mat);
-    terrain.receiveShadow = true;
-    this.group.add(terrain);
+    // 2. FORK 1 SPLIT (z: -220 -> -680)
+    else if (z <= -220 && z > -680) {
+      let leftX = -38.0;
+      let rightX = 38.0;
+      const leftY = 0.0 + Math.sin((z + 220) * 0.01) * 2.5;
+      const rightY = 0.0 + Math.cos((z + 220) * 0.01) * 2.5;
 
-    // Build Wooden Launch Ramp at bottom of downhill run (x = 0, z = 4)
-    const rampGroup = new THREE.Group();
-    const rampGeo = new THREE.BoxGeometry(4.0, 0.4, 6.0);
-    rampGeo.rotateX(-0.35); // Tilted launch angle!
-    const woodMat = new THREE.MeshToonMaterial({ color: 0x854d0e });
-    const rampMesh = new THREE.Mesh(rampGeo, woodMat);
-    rampMesh.position.set(0, 1.2, 4);
+      if (z > -280) {
+        const t = (-220 - z) / 60.0; // 0 to 1
+        leftX = 0 + t * (-38.0);
+        rightX = 0 + t * (38.0);
+      } else if (z < -620) {
+        const t = (-620 - z) / 60.0; // 0 to 1
+        leftX = -38.0 + t * (38.0);
+        rightX = 38.0 + t * (-38.0);
+      }
 
-    const rimGeo = new THREE.BoxGeometry(0.3, 0.6, 6.0);
-    rimGeo.rotateX(-0.35);
-    const cyanRimMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, emissive: 0x0284c7, emissiveIntensity: 1.5 });
-    const lRim = new THREE.Mesh(rimGeo, cyanRimMat);
-    lRim.position.set(-2.0, 1.3, 4);
-    const rRim = new THREE.Mesh(rimGeo, cyanRimMat);
-    rRim.position.set(2.0, 1.3, 4);
+      const distLeft = Math.abs(x - leftX);
+      const distRight = Math.abs(x - rightX);
+      const trackWidth = 14.0; // 28-unit wide lanes
 
-    rampGroup.add(rampMesh, lRim, rRim);
-    this.group.add(rampGroup);
+      if (distLeft <= trackWidth) return leftY;
+      if (distRight <= trackWidth) return rightY;
+    }
+
+    // 3. CHECKPOINT TRACK (z: -680 -> -920, centered at X = 0)
+    else if (z <= -680 && z > -920) {
+      const distFromCenter = Math.abs(x - 0);
+      if (distFromCenter <= 20.0) return 2.0;
+    }
+
+    // 4. FORK 2 SPLIT (SHORT vs LONG) (z: -920 -> -1580)
+    else if (z <= -920 && z > -1580) {
+      // SHORT PATH (Direct left branch, finishes faster)
+      let shortX = -32.0;
+      const shortY = 2.0 + Math.sin((z + 920) * 0.015) * 3.5;
+
+      if (z > -980) {
+        const t = (-920 - z) / 60.0;
+        shortX = 0 + t * (-32.0);
+      } else if (z < -1360) {
+        const t = Math.min(1.0, (-1360 - z) / 60.0);
+        shortX = -32.0 + t * (32.0);
+      }
+
+      // LONG PATH (Wider right loop swinging out to X = +55)
+      let longX = 55.0 * Math.sin(((-920 - z) / 600.0) * Math.PI);
+      const longY = 2.0 + Math.cos((z + 920) * 0.01) * 3.0;
+
+      if (z > -980) {
+        const t = (-920 - z) / 60.0;
+        longX = t * (45.0);
+      } else if (z < -1520) {
+        const t = Math.min(1.0, (-1520 - z) / 60.0);
+        longX = 45.0 * (1 - t);
+      }
+
+      const distShort = Math.abs(x - shortX);
+      const distLong = Math.abs(x - longX);
+
+      if (z >= -1420 && distShort <= 13.0) return shortY;
+      if (distLong <= 16.0) return longY;
+    }
+
+    // 5. GOAL TRACK (z: -1580 -> -1820, centered at X = 0)
+    else if (z <= -1580 && z >= -1820) {
+      const distFromCenter = Math.abs(x - 0);
+      if (distFromCenter <= 22.0) return 4.0;
+    }
+
+    // Off-track abyss drop
+    return -10.0;
   }
 
-  private buildMountains() {
-    // Backdrop jagged mountain peaks surrounding the valley
-    const mountainGeo = new THREE.ConeGeometry(8, 16, 6);
-    const mountainMat = new THREE.MeshToonMaterial({ color: 0x1e1b4b }); // Dark midnight indigo
-
-    const angles = [0, 0.8, 1.6, 2.4, 3.2, 4.0, 4.8, 5.6];
-    angles.forEach(a => {
-      const r = 32;
-      const x = Math.cos(a) * r;
-      const z = Math.sin(a) * r;
-      const peak = new THREE.Mesh(mountainGeo, mountainMat);
-      peak.position.set(x, 6, z);
-      this.group.add(peak);
+  private buildTronTrackGeometry() {
+    // Dark Glossy Metallic Tron Base Material
+    const darkFloorMat = new THREE.MeshStandardMaterial({
+      color: 0x030712,
+      roughness: 0.15,
+      metalness: 0.85
     });
+
+    // Neon Edge Materials
+    const cyanLightMat = new THREE.MeshStandardMaterial({
+      color: 0x06b6d4,
+      emissive: 0x06b6d4,
+      emissiveIntensity: 1.2
+    });
+    const magentaLightMat = new THREE.MeshStandardMaterial({
+      color: 0xd946ef,
+      emissive: 0xd946ef,
+      emissiveIntensity: 1.2
+    });
+    const amberLightMat = new THREE.MeshStandardMaterial({
+      color: 0xf97316,
+      emissive: 0xf97316,
+      emissiveIntensity: 1.2
+    });
+    const emeraldLightMat = new THREE.MeshStandardMaterial({
+      color: 0x10b981,
+      emissive: 0x10b981,
+      emissiveIntensity: 1.2
+    });
+
+    // Helper to spawn a Tron Track Segment with Glowing Border Rails
+    const createTronSegment = (
+      width: number,
+      length: number,
+      posX: number,
+      posY: number,
+      posZ: number,
+      lightMat: THREE.Material
+    ) => {
+      const group = new THREE.Group();
+
+      // Main Grid Slab
+      const slabGeo = new THREE.BoxGeometry(width, 0.4, length);
+      const slab = new THREE.Mesh(slabGeo, darkFloorMat);
+      slab.receiveShadow = true;
+      group.add(slab);
+
+      // Glowing Side Light Strips
+      const railGeo = new THREE.BoxGeometry(0.5, 0.6, length);
+      const leftRail = new THREE.Mesh(railGeo, lightMat);
+      leftRail.position.set(-width / 2 + 0.25, 0.2, 0);
+
+      const rightRail = new THREE.Mesh(railGeo, lightMat);
+      rightRail.position.set(width / 2 - 0.25, 0.2, 0);
+
+      group.add(leftRail, rightRail);
+      group.position.set(posX, posY, posZ);
+      this.group.add(group);
+    };
+
+    // 1. START HIGHWAY (Z = 20 to -220)
+    createTronSegment(32, 240, 0, -0.2, -100, cyanLightMat);
+
+    // 2. FORK 1 BRANCHES (Z = -220 to -680)
+    // Left Path (Magenta Light Rails)
+    for (let z = -250; z >= -650; z -= 50) {
+      let x = -38;
+      if (z > -310) x = ((-250 - z) / 60) * -38;
+      else if (z < -590) x = -38 + ((-590 - z) / 60) * 38;
+
+      const y = Math.sin((z + 220) * 0.01) * 2.5;
+      createTronSegment(26, 52, x, y - 0.2, z, magentaLightMat);
+    }
+
+    // Right Path (Amber Light Rails)
+    for (let z = -250; z >= -650; z -= 50) {
+      let x = 38;
+      if (z > -310) x = ((-250 - z) / 60) * 38;
+      else if (z < -590) x = 38 + ((-590 - z) / 60) * -38;
+
+      const y = Math.cos((z + 220) * 0.01) * 2.5;
+      createTronSegment(26, 52, x, y - 0.2, z, amberLightMat);
+    }
+
+    // 3. CHECKPOINT HIGHWAY (Z = -680 to -920)
+    createTronSegment(36, 240, 0, 1.8, -800, cyanLightMat);
+
+    // 4. FORK 2 BRANCHES (Z = -920 to -1580)
+    // Short Path (Left Branch - High-Speed Cyan Light Rails)
+    for (let z = -950; z >= -1380; z -= 50) {
+      let x = -32;
+      if (z > -1010) x = ((-950 - z) / 60) * -32;
+      else if (z < -1320) x = -32 + ((-1320 - z) / 60) * 32;
+
+      const y = 2.0 + Math.sin((z + 920) * 0.015) * 3.5;
+      createTronSegment(24, 52, x, y - 0.2, z, cyanLightMat);
+    }
+
+    // Long Path (Right Branch - Emerald Scenic Curve)
+    for (let z = -950; z >= -1550; z -= 50) {
+      let x = 55.0 * Math.sin(((-920 - z) / 600.0) * Math.PI);
+      if (z > -1010) x = ((-950 - z) / 60) * 45;
+      else if (z < -1490) x = 45 * (1 - (-1490 - z) / 60);
+
+      const y = 2.0 + Math.cos((z + 920) * 0.01) * 3.0;
+      createTronSegment(28, 52, x, y - 0.2, z, emeraldLightMat);
+    }
+
+    // 5. GOAL HIGHWAY (Z = -1580 to -1820)
+    createTronSegment(40, 240, 0, 3.8, -1700, cyanLightMat);
   }
 
-  private buildBioluminescentFlora() {
-    // Floating Glowing Crystals
-    const crystalGeo = new THREE.OctahedronGeometry(0.6, 0);
-    const crystalMat = new THREE.MeshStandardMaterial({
+  private buildOriginalValleyTerrain() {
+    const canyonMat = new THREE.MeshToonMaterial({ color: 0x1e1b4b });
+    const crystalRimMat = new THREE.MeshStandardMaterial({
+      color: 0xc084fc,
+      emissive: 0x9333ea,
+      emissiveIntensity: 0.6
+    });
+
+    // Build serpentine 2500-unit mountain valley track
+    for (let z = 20; z >= -2500; z -= 30) {
+      const dist = Math.max(0, -z);
+      const centerX = Math.sin(dist * 0.008) * 45.0 + Math.sin(dist * 0.02) * 20.0;
+      const centerY = Math.sin(dist * 0.006) * 12.0 + Math.cos(dist * 0.015) * 6.0;
+
+      const segGeo = new THREE.BoxGeometry(70, 2.0, 32);
+      const seg = new THREE.Mesh(segGeo, canyonMat);
+      seg.position.set(centerX, centerY - 1.0, z);
+      seg.receiveShadow = true;
+      this.group.add(seg);
+
+      // Bioluminescent Crystal Border Rails along path edges
+      [-34, 34].forEach(offset => {
+        const borderGeo = new THREE.BoxGeometry(2.0, 1.2, 32);
+        const border = new THREE.Mesh(borderGeo, crystalRimMat);
+        border.position.set(centerX + offset, centerY + 0.6, z);
+        this.group.add(border);
+      });
+    }
+  }
+
+  private buildOriginalValleyScenery() {
+    // Bioluminescent Valley Scenery (Crystal Trees, Glowing Minerals, Sky Islands)
+    const treeTrunkMat = new THREE.MeshToonMaterial({ color: 0x311b92 });
+    const treeFoliageMat = new THREE.MeshStandardMaterial({
+      color: 0xa855f7,
+      emissive: 0x7e22ce,
+      emissiveIntensity: 0.7
+    });
+
+    for (let z = 0; z >= -2400; z -= 60) {
+      const dist = Math.max(0, -z);
+      const centerX = Math.sin(dist * 0.008) * 45.0 + Math.sin(dist * 0.02) * 20.0;
+      const centerY = Math.sin(dist * 0.006) * 12.0 + Math.cos(dist * 0.015) * 6.0;
+
+      [-42, 42].forEach(side => {
+        const treeGroup = new THREE.Group();
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 7.0, 8), treeTrunkMat);
+        trunk.position.y = 3.5;
+        const foliage = new THREE.Mesh(new THREE.IcosahedronGeometry(3.5, 1), treeFoliageMat);
+        foliage.position.y = 8.0;
+
+        treeGroup.add(trunk, foliage);
+        treeGroup.position.set(centerX + side, centerY, z);
+        this.group.add(treeGroup);
+      });
+    }
+  }
+
+  private buildTronSceneryAndArches() {
+    // 1. Digital Wireframe Cyber Pillars along the void sides
+    const pillarGeo = new THREE.BoxGeometry(3, 30, 3);
+    const pillarMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      emissive: 0x0369a1,
+      emissiveIntensity: 0.6,
+      wireframe: true
+    });
+
+    for (let z = 20; z >= -1800; z -= 80) {
+      [-65, 65].forEach(sideX => {
+        const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+        pillar.position.set(sideX, 10, z);
+        this.group.add(pillar);
+      });
+    }
+
+    // 2. Holographic Archway Sign helpers
+    const createArchway = (z: number, x: number, y: number, labelColor: number, labelText: string) => {
+      const group = new THREE.Group();
+
+      const pillarMat = new THREE.MeshStandardMaterial({
+        color: labelColor,
+        emissive: labelColor,
+        emissiveIntensity: 0.9
+      });
+
+      const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 12), pillarMat);
+      leftPillar.position.set(-18, 6, 0);
+
+      const rightPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 12), pillarMat);
+      rightPillar.position.set(18, 6, 0);
+
+      const headerBar = new THREE.Mesh(new THREE.BoxGeometry(36, 0.6, 0.6), pillarMat);
+      headerBar.position.set(0, 11.8, 0);
+
+      group.add(leftPillar, rightPillar, headerBar);
+      group.position.set(x, y, z);
+      this.group.add(group);
+    };
+
+    // Spawn Tron Archways at key junctions
+    createArchway(10, 0, 0, 0x06b6d4, 'START LINE');
+    createArchway(-210, 0, 0, 0xd946ef, 'FORK 1: LEFT vs RIGHT');
+    createArchway(-910, 0, 2, 0x10b981, 'FORK 2: SHORT vs LONG');
+
+    // 3. TRON CHECKPOINT GATE at Z = -800
+    const cpGroup = new THREE.Group();
+    const cpMat = new THREE.MeshStandardMaterial({
+      color: 0x06b6d4,
+      emissive: 0x06b6d4,
+      emissiveIntensity: 1.5
+    });
+
+    const cpLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 14), cpMat);
+    cpLeft.position.set(-14, 7, 0);
+
+    const cpRight = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 14), cpMat);
+    cpRight.position.set(14, 7, 0);
+
+    const cpHeader = new THREE.Mesh(new THREE.BoxGeometry(28, 1.2, 1.2), cpMat);
+    cpHeader.position.set(0, 13.5, 0);
+
+    // Scanner beam curtain
+    const beamMat = new THREE.MeshBasicMaterial({
       color: 0x38bdf8,
-      emissive: 0x0284c7,
-      emissiveIntensity: 0.8,
-      roughness: 0.1
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide
     });
+    const beamMesh = new THREE.Mesh(new THREE.PlaneGeometry(26, 12), beamMat);
+    beamMesh.position.set(0, 6, 0);
 
-    for (let i = 0; i < 15; i++) {
-      const crystal = new THREE.Mesh(crystalGeo, crystalMat);
-      const x = (Math.random() - 0.5) * 30;
-      const z = (Math.random() - 0.5) * 30;
-      const h = this.getGroundHeight(x, z);
+    cpGroup.add(cpLeft, cpRight, cpHeader, beamMesh);
+    const cpPos = new THREE.Vector3(0, 2.0, -800);
+    cpGroup.position.copy(cpPos);
+    this.group.add(cpGroup);
 
-      crystal.position.set(x, h + 1.5 + Math.random() * 1.5, z);
-      crystal.rotation.set(Math.random(), Math.random(), Math.random());
-      this.group.add(crystal);
-      this.floatingCrystals.push(crystal);
-    }
-
-    // Glowing Mushrooms & Plants
-    const shroomCapGeo = new THREE.ConeGeometry(0.5, 0.4, 12);
-    const shroomCapMat = new THREE.MeshToonMaterial({ color: 0xf43f5e });
-    const shroomStemGeo = new THREE.CylinderGeometry(0.1, 0.15, 0.6, 8);
-    const shroomStemMat = new THREE.MeshToonMaterial({ color: 0xf1f5f9 });
-
-    for (let i = 0; i < 20; i++) {
-      const shroom = new THREE.Group();
-      const stem = new THREE.Mesh(shroomStemGeo, shroomStemMat);
-      stem.position.y = 0.3;
-
-      const cap = new THREE.Mesh(shroomCapGeo, shroomCapMat);
-      cap.position.y = 0.7;
-
-      shroom.add(stem, cap);
-
-      const x = (Math.random() - 0.5) * 40;
-      const z = (Math.random() - 0.5) * 40;
-      const h = this.getGroundHeight(x, z);
-      shroom.position.set(x, h, z);
-
-      this.group.add(shroom);
-    }
+    this.checkpoint = {
+      position: cpPos,
+      mesh: cpGroup,
+      activated: false
+    };
   }
 
   private buildDiscoveryPoints() {
-    // 1. Ancient Crystal Tree
-    const crystalTreeGroup = new THREE.Group();
-
-    const trunkGeo = new THREE.CylinderGeometry(0.4, 0.6, 3.5, 8);
-    const trunkMat = new THREE.MeshToonMaterial({ color: 0x475569 });
-    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-    trunk.position.y = 1.75;
-
-    const crownGeo = new THREE.DodecahedronGeometry(2.0, 1);
-    const crownMat = new THREE.MeshStandardMaterial({
+    // Tron Memory Core Landmark at Z = -500
+    const crystalGroup = new THREE.Group();
+    const coreGeo = new THREE.OctahedronGeometry(2.8, 0);
+    const coreMat = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
       emissive: 0x0284c7,
-      emissiveIntensity: 0.9,
-      roughness: 0.2
+      emissiveIntensity: 1.0,
+      wireframe: true
     });
-    const crown = new THREE.Mesh(crownGeo, crownMat);
-    crown.position.y = 4.2;
+    const core = new THREE.Mesh(coreGeo, coreMat);
+    core.position.y = 4.0;
 
-    crystalTreeGroup.add(trunk, crown);
-    const pos1 = new THREE.Vector3(0, this.getGroundHeight(0, -12), -12);
-    crystalTreeGroup.position.copy(pos1);
-    this.group.add(crystalTreeGroup);
+    crystalGroup.add(core);
+    const pos = new THREE.Vector3(-38, 2.0, -500); // Left path discovery core
+    crystalGroup.position.copy(pos);
+    this.group.add(crystalGroup);
 
     this.discoveryPoints.push({
-      id: 'point_crystal_tree',
-      name: 'Ancient Crystal Tree',
-      position: pos1,
-      mesh: crystalTreeGroup,
-      memoryTitle: 'Crystal Tree Whispers',
-      memoryText: 'Lumi discovered an ancient memory! "In primordial times, Solanders sang in resonance with the star crystals."',
-      discovered: false
-    });
-
-    // 2. Starfall Shrine
-    const shrineGroup = new THREE.Group();
-
-    const pillarGeo = new THREE.BoxGeometry(0.6, 2.5, 0.6);
-    const pillarMat = new THREE.MeshToonMaterial({ color: 0x94a3b8 });
-
-    [-1, 1].forEach(dx => {
-      const p = new THREE.Mesh(pillarGeo, pillarMat);
-      p.position.set(dx * 1.2, 1.25, 0);
-      shrineGroup.add(p);
-    });
-
-    const orbGeo = new THREE.SphereGeometry(0.5, 16, 16);
-    const orbMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15,
-      emissive: 0xeab308,
-      emissiveIntensity: 1.0
-    });
-    const orb = new THREE.Mesh(orbGeo, orbMat);
-    orb.position.set(0, 2.0, 0);
-    shrineGroup.add(orb);
-
-    const pos2 = new THREE.Vector3(12, this.getGroundHeight(12, 6), 6);
-    shrineGroup.position.copy(pos2);
-    this.group.add(shrineGroup);
-
-    this.discoveryPoints.push({
-      id: 'point_starfall_shrine',
-      name: 'Starfall Shrine',
-      position: pos2,
-      mesh: shrineGroup,
-      memoryTitle: 'Starfall Rune',
-      memoryText: 'Lumi discovered an ancient memory! "A falling star granted warmth to the first garden egg."',
+      id: 'point_tron_core',
+      name: 'Tron System Core',
+      position: pos,
+      mesh: crystalGroup,
+      memoryTitle: 'Digital Grid Archives',
+      memoryText: 'Lumi accessed the Grid Archives! "High speed and rapid agility open pathways through the digital realm!"',
       discovered: false
     });
   }
 
   private buildResourceNodes() {
-    // 1. Essence Orbs (Glowing golden/cyan spheres)
-    const essenceGeo = new THREE.SphereGeometry(0.28, 16, 16);
+    const essenceGeo = new THREE.OctahedronGeometry(0.45, 0);
     const essenceMat = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
-      emissive: 0x38bdf8,
+      emissive: 0x0284c7,
       emissiveIntensity: 0.9
     });
 
-    const essenceCoords = [
-      [-6, 4], [8, -8], [-12, -5], [14, 12], [-4, 15], [6, 18], [-15, 10]
-    ];
+    for (let z = 0; z >= -1700; z -= 45) {
+      const h = this.getGroundHeight(0, z);
+      if (h > -5.0) {
+        const g = new THREE.Group();
+        const m = new THREE.Mesh(essenceGeo, essenceMat);
+        m.position.y = 0.8;
+        g.add(m);
 
-    essenceCoords.forEach(([x, z], idx) => {
-      const g = new THREE.Group();
-      const m = new THREE.Mesh(essenceGeo, essenceMat);
-      m.position.y = 0.5;
-      g.add(m);
+        const pos = new THREE.Vector3(0, h + 0.2, z);
+        g.position.copy(pos);
+        this.group.add(g);
 
-      const h = this.getGroundHeight(x, z);
-      const pos = new THREE.Vector3(x, h, z);
-      g.position.copy(pos);
-      this.group.add(g);
-
-      this.resourceNodes.push({
-        id: `res_essence_${idx}`,
-        type: 'essence',
-        name: '✨ Solander Essence',
-        position: pos,
-        mesh: g,
-        collected: false
-      });
-    });
-
-    // 2. Seeds (Sprouting green nodes)
-    const seedStemGeo = new THREE.CylinderGeometry(0.05, 0.08, 0.4, 8);
-    const seedStemMat = new THREE.MeshToonMaterial({ color: 0x22c55e });
-    const seedLeafGeo = new THREE.SphereGeometry(0.2, 8, 8);
-    seedLeafGeo.scale(1, 0.4, 0.6);
-
-    const seedCoords = [
-      [5, 3], [-8, -10], [10, -14], [-10, 8], [2, -18]
-    ];
-
-    seedCoords.forEach(([x, z], idx) => {
-      const g = new THREE.Group();
-      const stem = new THREE.Mesh(seedStemGeo, seedStemMat);
-      stem.position.y = 0.2;
-      const leaf1 = new THREE.Mesh(seedLeafGeo, seedStemMat);
-      leaf1.position.set(-0.1, 0.35, 0);
-      leaf1.rotation.z = -0.4;
-      const leaf2 = new THREE.Mesh(seedLeafGeo, seedStemMat);
-      leaf2.position.set(0.1, 0.35, 0);
-      leaf2.rotation.z = 0.4;
-      g.add(stem, leaf1, leaf2);
-
-      const h = this.getGroundHeight(x, z);
-      const pos = new THREE.Vector3(x, h, z);
-      g.position.copy(pos);
-      this.group.add(g);
-
-      this.resourceNodes.push({
-        id: `res_seed_${idx}`,
-        type: 'seeds',
-        name: '🌱 Ancient Seed',
-        position: pos,
-        mesh: g,
-        collected: false
-      });
-    });
-
-    // 3. Crystal Cluster Nodes (💎)
-    const crystalGeo = new THREE.ConeGeometry(0.25, 0.6, 5);
-    const crystalMat = new THREE.MeshStandardMaterial({
-      color: 0x818cf8,
-      emissive: 0x6366f1,
-      emissiveIntensity: 0.8,
-      roughness: 0.1
-    });
-
-    const crystalCoords = [
-      [-2, -8], [15, -4], [-16, -14], [8, -20], [-12, 16]
-    ];
-
-    crystalCoords.forEach(([x, z], idx) => {
-      const g = new THREE.Group();
-      for (let i = 0; i < 3; i++) {
-        const c = new THREE.Mesh(crystalGeo, crystalMat);
-        c.position.set((i - 1) * 0.18, 0.3, (i % 2) * 0.1);
-        c.rotation.set((Math.random() - 0.5) * 0.3, Math.random(), (Math.random() - 0.5) * 0.3);
-        g.add(c);
+        this.resourceNodes.push({
+          id: `res_essence_${z}`,
+          type: 'essence',
+          name: '✨ Solander Data Essence',
+          position: pos,
+          mesh: g,
+          collected: false
+        });
       }
-
-      const h = this.getGroundHeight(x, z);
-      const pos = new THREE.Vector3(x, h, z);
-      g.position.copy(pos);
-      this.group.add(g);
-
-      this.resourceNodes.push({
-        id: `res_crystal_${idx}`,
-        type: 'crystals',
-        name: '💎 Shimmering Crystal',
-        position: pos,
-        mesh: g,
-        collected: false
-      });
-    });
+    }
   }
 
   private buildTrialPedestal() {
     const group = new THREE.Group();
-
-    // Ancient Stone Pedestal
-    const baseGeo = new THREE.CylinderGeometry(1.2, 1.5, 0.6, 12);
-    const stoneMat = new THREE.MeshToonMaterial({ color: 0x64748b });
-    const base = new THREE.Mesh(baseGeo, stoneMat);
+    const baseGeo = new THREE.CylinderGeometry(1.8, 2.2, 0.6, 16);
+    const baseMat = new THREE.MeshToonMaterial({ color: 0x0f172a });
+    const base = new THREE.Mesh(baseGeo, baseMat);
     base.position.y = 0.3;
 
-    // Glowing Trial Ring
-    const ringGeo = new THREE.TorusGeometry(0.9, 0.08, 12, 24);
-    const ringMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15,
-      emissive: 0xeab308,
-      emissiveIntensity: 1.0
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.65;
-
-    // Floating Crest
-    const crestGeo = new THREE.OctahedronGeometry(0.4, 0);
-    const crestMat = new THREE.MeshStandardMaterial({
-      color: 0xf43f5e,
-      emissive: 0xf43f5e,
-      emissiveIntensity: 0.9
-    });
-    const crest = new THREE.Mesh(crestGeo, crestMat);
-    crest.position.y = 1.6;
-
-    group.add(base, ring, crest);
-
-    const pos = new THREE.Vector3(-8, this.getGroundHeight(-8, -15), -15);
+    group.add(base);
+    const pos = new THREE.Vector3(-12, 0, -120);
     group.position.copy(pos);
     this.group.add(group);
 
-    this.trialPedestal = {
-      position: pos,
-      mesh: group
-    };
+    this.trialPedestal = { position: pos, mesh: group };
   }
 
   public spawnVoidEnemies() {
-    const enemySpawns = [
-      [-10, 5], [12, -10], [5, 14], [-14, -8], [15, 8]
+    const enemyZList = [
+      -180, -380, -550, -840, -1120, -1450, -1650
     ];
 
-    const bodyGeo = new THREE.DodecahedronGeometry(0.55, 1);
-    const bodyMat = new THREE.MeshToonMaterial({ color: 0x1e1b4b }); // Dark void indigo
-    const eyeGeo = new THREE.SphereGeometry(0.12, 12, 12);
+    const bodyGeo = new THREE.OctahedronGeometry(0.9, 0);
+    const bodyMat = new THREE.MeshToonMaterial({ color: 0x0f172a });
+    const eyeGeo = new THREE.SphereGeometry(0.2, 12, 12);
     const eyeMat = new THREE.MeshStandardMaterial({
       color: 0xef4444,
-      emissive: 0xd97706,
-      emissiveIntensity: 1.2
+      emissive: 0xef4444,
+      emissiveIntensity: 1.0
     });
 
-    enemySpawns.forEach(([x, z], idx) => {
+    enemyZList.forEach((z, idx) => {
+      const h = this.getGroundHeight(0, z);
       const g = new THREE.Group();
       const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = 0.55;
+      body.position.y = 0.9;
 
       const eye = new THREE.Mesh(eyeGeo, eyeMat);
-      eye.position.set(0, 0.62, 0.45);
+      eye.position.set(0, 0.95, 0.65);
 
       g.add(body, eye);
 
-      const h = this.getGroundHeight(x, z);
-      const pos = new THREE.Vector3(x, h, z);
+      const pos = new THREE.Vector3(idx % 2 === 0 ? -6 : 6, h, z);
       g.position.copy(pos);
       this.group.add(g);
 
       this.enemies.push({
-        id: `void_shade_${idx}`,
+        id: `void_sentinel_${idx}`,
         position: pos,
         velocity: new THREE.Vector3(),
         mesh: g,
@@ -433,28 +575,157 @@ export class MysticValleyWorld {
   }
 
   public update(time: number) {
-    // Animate floating crystals bobbing & rotating
-    this.floatingCrystals.forEach((c, i) => {
-      c.rotation.x += 0.01;
-      c.rotation.y += 0.015;
-      c.position.y += Math.sin(time * 2 + i) * 0.002;
-    });
-
-    // Bobbing resource nodes
     this.resourceNodes.forEach((node, i) => {
       if (!node.collected) {
-        node.mesh.position.y = node.position.y + Math.sin(time * 3 + i) * 0.08;
-        node.mesh.rotation.y += 0.015;
+        node.mesh.position.y = node.position.y + Math.sin(time * 3 + i) * 0.12;
+        node.mesh.rotation.y += 0.025;
       }
     });
 
-    // Animate active Void Enemies
     this.enemies.forEach((enemy, i) => {
       if (enemy.alive) {
-        enemy.mesh.position.y = enemy.position.y + Math.sin(time * 4 + i) * 0.12;
+        enemy.mesh.position.y = enemy.position.y + Math.sin(time * 4 + i) * 0.14;
         enemy.mesh.rotation.y = Math.sin(time * 1.5 + i) * 0.5;
-        enemy.mesh.scale.setScalar(1 + Math.sin(time * 6 + i) * 0.05);
       }
     });
+
+    this.speedRings.forEach(ring => {
+      if (!ring.collected) {
+        ring.mesh.rotation.y += 0.04;
+      }
+    });
+
+    if (this.goalRing && this.goalRing.mesh) {
+      this.goalRing.mesh.rotation.y += 0.03;
+    }
+  }
+
+  private buildSonicCourse() {
+    // 1. DASH PANELS
+    const arrowGeo = new THREE.ConeGeometry(0.9, 2.0, 3);
+    arrowGeo.rotateX(Math.PI / 2);
+    const arrowMat = new THREE.MeshStandardMaterial({
+      color: 0x06b6d4,
+      emissive: 0x06b6d4,
+      emissiveIntensity: 1.2
+    });
+    const panelBaseGeo = new THREE.BoxGeometry(2.4, 0.1, 3.0);
+    const panelBaseMat = new THREE.MeshToonMaterial({ color: 0x0f172a });
+
+    const dashZList = [-80, -320, -520, -740, -1020, -1250, -1620];
+
+    dashZList.forEach((z, idx) => {
+      const h = this.getGroundHeight(0, z);
+      const g = new THREE.Group();
+      const base = new THREE.Mesh(panelBaseGeo, panelBaseMat);
+      base.position.y = 0.05;
+      const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+      arrow.position.set(0, 0.14, 0);
+
+      g.add(base, arrow);
+
+      const pos = new THREE.Vector3(0, h + 0.05, z);
+      g.position.copy(pos);
+      this.group.add(g);
+
+      this.dashPanels.push({
+        id: `dash_panel_${idx}`,
+        position: pos,
+        directionAngle: Math.PI,
+        mesh: g,
+        cooldowned: false
+      });
+    });
+
+    // 2. SPRING LAUNCH PADS
+    const coilGeo = new THREE.CylinderGeometry(0.85, 0.95, 0.45, 16);
+    const coilMat = new THREE.MeshStandardMaterial({ color: 0xd946ef, roughness: 0.2 });
+    const topCapGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.1, 16);
+    const topCapMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.8 });
+
+    const springZList = [-420, -1180, -1480];
+
+    springZList.forEach((z, idx) => {
+      const h = this.getGroundHeight(0, z);
+      const g = new THREE.Group();
+      const coil = new THREE.Mesh(coilGeo, coilMat);
+      coil.position.y = 0.22;
+      const cap = new THREE.Mesh(topCapGeo, topCapMat);
+      cap.position.y = 0.45;
+
+      g.add(coil, cap);
+      const pos = new THREE.Vector3(0, h, z);
+      g.position.copy(pos);
+      this.group.add(g);
+
+      this.springPads.push({
+        id: `spring_pad_${idx}`,
+        position: pos,
+        upwardForce: 38,
+        forwardSpeed: 32,
+        mesh: g,
+        cooldowned: false
+      });
+    });
+
+    // 3. SPEED RINGS
+    const ringGeo = new THREE.TorusGeometry(0.8, 0.12, 12, 24);
+    const ringMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      emissive: 0xca8a04,
+      emissiveIntensity: 0.85,
+      metalness: 0.9,
+      roughness: 0.1
+    });
+
+    for (let z = 0; z >= -1680; z -= 25) {
+      const h = this.getGroundHeight(0, z);
+      if (h > -5.0) {
+        const g = new THREE.Group();
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        g.add(ring);
+
+        const pos = new THREE.Vector3(0, h + 1.5, z);
+        g.position.copy(pos);
+        this.group.add(g);
+
+        this.speedRings.push({
+          id: `speed_ring_${z}`,
+          position: pos,
+          collected: false,
+          mesh: g
+        });
+      }
+    }
+
+    // 4. TRON GOAL PORTAL AT FINISH LINE (Z = -1700)
+    const goalGroup = new THREE.Group();
+    const goalRingGeo = new THREE.TorusGeometry(3.5, 0.4, 16, 32);
+    const goalRingMat = new THREE.MeshStandardMaterial({
+      color: 0x06b6d4,
+      emissive: 0x06b6d4,
+      emissiveIntensity: 1.5,
+      metalness: 0.9,
+      roughness: 0.1
+    });
+    const goalMesh = new THREE.Mesh(goalRingGeo, goalRingMat);
+    goalMesh.position.y = 4.0;
+
+    const baseGeo = new THREE.CylinderGeometry(3.0, 3.8, 1.2, 16);
+    const baseMat = new THREE.MeshToonMaterial({ color: 0x0f172a });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = 0.6;
+
+    goalGroup.add(base, goalMesh);
+
+    const goalPos = new THREE.Vector3(0, 4.0, -1700);
+    goalGroup.position.copy(goalPos);
+    this.group.add(goalGroup);
+
+    this.goalRing = {
+      position: goalPos,
+      mesh: goalGroup,
+      activated: false
+    };
   }
 }

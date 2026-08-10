@@ -231,6 +231,66 @@ export class SolanderCreature {
     this.skyWingsGroup.add(leftFeather, rightFeather);
     this.skyWingsGroup.visible = this.data.form === 'SKY';
     this.mesh.add(this.skyWingsGroup);
+
+    // --- ACCESSORIES ATTACHMENT GROUP ---
+    this.buildAccessoryMeshes();
+  }
+
+  private crownMesh: THREE.Group | null = null;
+  private bowtieMesh: THREE.Mesh | null = null;
+  private glassesMesh: THREE.Group | null = null;
+
+  private buildAccessoryMeshes() {
+    // 1. Royal Gold Crown
+    this.crownMesh = new THREE.Group();
+    const crownBaseGeo = new THREE.CylinderGeometry(0.22, 0.2, 0.15, 8, 1, true);
+    const crownMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.8, roughness: 0.2 });
+    const crownBase = new THREE.Mesh(crownBaseGeo, crownMat);
+    this.crownMesh.add(crownBase);
+
+    const spikeGeo = new THREE.ConeGeometry(0.04, 0.12, 4);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const spike = new THREE.Mesh(spikeGeo, crownMat);
+      spike.position.set(Math.cos(a) * 0.2, 0.12, Math.sin(a) * 0.2);
+      this.crownMesh.add(spike);
+    }
+    this.crownMesh.position.set(0, 0.52, 0);
+    this.headGroup.add(this.crownMesh);
+
+    // 2. Red Bowtie
+    const bowGeo = new THREE.ConeGeometry(0.1, 0.18, 4);
+    const bowMat = new THREE.MeshToonMaterial({ color: 0xef4444 });
+    const leftBow = new THREE.Mesh(bowGeo, bowMat);
+    leftBow.rotation.z = Math.PI / 2;
+    leftBow.position.set(-0.08, -0.22, 0.35);
+    const rightBow = new THREE.Mesh(bowGeo, bowMat);
+    rightBow.rotation.z = -Math.PI / 2;
+    rightBow.position.set(0.08, -0.22, 0.35);
+    const bowKnot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 8), bowMat);
+    bowKnot.position.set(0, -0.22, 0.37);
+
+    const bowGroup = new THREE.Group();
+    bowGroup.add(leftBow, rightBow, bowKnot);
+    this.bowtieMesh = bowKnot;
+    this.headGroup.add(bowGroup);
+
+    // 3. Cool Glasses
+    this.glassesMesh = new THREE.Group();
+    const glassLensGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.02, 12);
+    glassLensGeo.rotateX(Math.PI / 2);
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.1 });
+    const leftLens = new THREE.Mesh(glassLensGeo, glassMat);
+    leftLens.position.set(-0.16, 0.02, 0.46);
+    const rightLens = new THREE.Mesh(glassLensGeo, glassMat);
+    rightLens.position.set(0.16, 0.02, 0.46);
+
+    const bridgeGeo = new THREE.BoxGeometry(0.12, 0.02, 0.02);
+    const bridge = new THREE.Mesh(bridgeGeo, glassMat);
+    bridge.position.set(0, 0.02, 0.46);
+
+    this.glassesMesh.add(leftLens, rightLens, bridge);
+    this.headGroup.add(this.glassesMesh);
   }
 
   public syncFormVisuals() {
@@ -240,6 +300,12 @@ export class SolanderCreature {
     if (this.skyWingsGroup) {
       this.skyWingsGroup.visible = this.data.form === 'SKY';
     }
+
+    // Accessory visibility sync
+    const activeAcc = this.data.activeAccessory;
+    if (this.crownMesh) this.crownMesh.visible = activeAcc === 'crown';
+    if (this.bowtieMesh && this.bowtieMesh.parent) this.bowtieMesh.parent.visible = activeAcc === 'bowtie';
+    if (this.glassesMesh) this.glassesMesh.visible = activeAcc === 'glasses';
   }
 
   public triggerHappyReaction() {
@@ -295,9 +361,12 @@ export class SolanderCreature {
       this.mesh.rotation.z = 0;
     }
 
-    // Smooth movement position update
+    // Smooth movement position update with high ground friction to prevent slipping
     if (!this.isSwimming) {
       this.position.addScaledVector(this.velocity, deltaTime);
+      // High terrain friction on ground
+      this.velocity.x *= Math.max(0, 1 - 12.0 * deltaTime);
+      this.velocity.z *= Math.max(0, 1 - 12.0 * deltaTime);
     }
     const groundY = getGroundHeight(this.position.x, this.position.z);
 

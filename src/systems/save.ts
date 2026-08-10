@@ -21,12 +21,29 @@ export interface SolanderCreatureData {
   alignment: 'HERO' | 'NEUTRAL' | 'DARK';
   alignmentScore: number; // -100 (Pure Dark) to +100 (Pure Hero)
 
-  // --- Primary Performance Stats (1-99) ---
+  // --- Primary Performance Stats & Leveling (1-99) ---
   swimStat: number;
+  swimLv: number;
+  swimExp: number;
+
   flyStat: number;
+  flyLv: number;
+  flyExp: number;
+
   runStat: number;
+  runLv: number;
+  runExp: number;
+
   powerStat: number;
+  powerLv: number;
+  powerExp: number;
+
   staminaStat: number;
+  staminaLv: number;
+  staminaExp: number;
+
+  accessories?: string[];
+  activeAccessory?: string | null;
 
   // --- Kindergarten Classroom Skills ---
   dancingSkill: number; // 0 - 100
@@ -52,7 +69,7 @@ export interface PlayerResources {
 }
 
 export interface GameState {
-  currentWorld: 'GARDEN' | 'MYSTIC_VALLEY';
+  currentWorld: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD';
   companionId: string | null;
   hatchedEggs: string[];
   resources: PlayerResources;
@@ -74,7 +91,7 @@ export class SaveSystem {
     const lumi: SolanderCreatureData = {
       id: 'solander_lumi',
       name: 'Lumi',
-      species: 'Light Solander',
+      species: 'Hero Chao Solander',
       personality: 'Playful & Loyal',
       happiness: 85,
       curiosity: 92,
@@ -91,10 +108,22 @@ export class SaveSystem {
       alignment: 'HERO',
       alignmentScore: 45,
       swimStat: 22,
+      swimLv: 5,
+      swimExp: 40,
       flyStat: 35,
+      flyLv: 8,
+      flyExp: 60,
       runStat: 28,
+      runLv: 7,
+      runExp: 15,
       powerStat: 18,
+      powerLv: 4,
+      powerExp: 50,
       staminaStat: 30,
+      staminaLv: 6,
+      staminaExp: 30,
+      accessories: ['bowtie', 'crown', 'halo'],
+      activeAccessory: 'halo',
       dancingSkill: 40,
       singingSkill: 25,
       drawingSkill: 15,
@@ -123,10 +152,20 @@ export class SaveSystem {
       alignment: 'NEUTRAL',
       alignmentScore: 0,
       swimStat: 15,
+      swimLv: 3,
+      swimExp: 10,
       flyStat: 48,
+      flyLv: 11,
+      flyExp: 25,
       runStat: 12,
+      runLv: 2,
+      runExp: 50,
       powerStat: 10,
+      powerLv: 2,
+      powerExp: 0,
       staminaStat: 20,
+      staminaLv: 4,
+      staminaExp: 20,
       dancingSkill: 10,
       singingSkill: 50,
       drawingSkill: 60,
@@ -154,10 +193,20 @@ export class SaveSystem {
       alignment: 'DARK',
       alignmentScore: -40,
       swimStat: 40,
+      swimLv: 9,
+      swimExp: 80,
       flyStat: 10,
+      flyLv: 2,
+      flyExp: 0,
       runStat: 25,
+      runLv: 6,
+      runExp: 10,
       powerStat: 42,
+      powerLv: 10,
+      powerExp: 40,
       staminaStat: 38,
+      staminaLv: 8,
+      staminaExp: 90,
       dancingSkill: 20,
       singingSkill: 10,
       drawingSkill: 10,
@@ -299,7 +348,7 @@ export class SaveSystem {
     }
   }
 
-  public setWorld(world: 'GARDEN' | 'MYSTIC_VALLEY') {
+  public setWorld(world: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD') {
     this.state.currentWorld = world;
     this.notify();
   }
@@ -313,6 +362,41 @@ export class SaveSystem {
     }
   }
 
+  public gainStatExp(stat: 'swim' | 'fly' | 'run' | 'power' | 'stamina', expAmount: number, creatureId?: string) {
+    const companion = creatureId ? this.getCreature(creatureId) : this.getCompanion();
+    if (!companion) return;
+
+    const statKey = `${stat}Stat` as keyof SolanderCreatureData;
+    const lvKey = `${stat}Lv` as keyof SolanderCreatureData;
+    const expKey = `${stat}Exp` as keyof SolanderCreatureData;
+
+    let currentLv = (companion[lvKey] as number) || 1;
+    let currentExp = (companion[expKey] as number) || 0;
+    let currentVal = (companion[statKey] as number) || 10;
+
+    currentExp += expAmount;
+    let leveledUp = false;
+
+    while (currentExp >= 100 && currentLv < 99) {
+      currentExp -= 100;
+      currentLv += 1;
+      currentVal = Math.min(99, currentVal + 4);
+      leveledUp = true;
+    }
+
+    (companion[lvKey] as number) = currentLv;
+    (companion[expKey] as number) = currentExp;
+    (companion[statKey] as number) = currentVal;
+
+    if (leveledUp) {
+      this.setMessage(`🌟 LEVEL UP! ${companion.name}'s ${stat.toUpperCase()} reached Lv.${currentLv}! (Stat: ${currentVal})`);
+      this.addMemory(`${companion.name} Level Up`, `${companion.name} trained hard and leveled up ${stat.toUpperCase()} to Lv.${currentLv}!`);
+      this.checkEvolution(companion);
+    }
+
+    this.notify();
+  }
+
   public feedFruit(fruitType: 'swimFruit' | 'flyFruit' | 'runFruit' | 'powerFruit' | 'staminaFruit' | 'heroFruit' | 'darkFruit'): boolean {
     if (!this.state.resources || (this.state.resources[fruitType] || 0) <= 0) return false;
 
@@ -320,42 +404,58 @@ export class SaveSystem {
     if (!companion) return false;
 
     this.state.resources[fruitType] = (this.state.resources[fruitType] || 1) - 1;
+    companion.happiness = Math.min(100, companion.happiness + 15);
+    companion.bond = Math.min(100, companion.bond + 5);
 
     switch (fruitType) {
       case 'swimFruit':
-        companion.swimStat = Math.min(99, companion.swimStat + 4);
-        this.setMessage(`🌊 ${companion.name} ate a Swim Fruit! Swim Stat +4!`);
+        this.gainStatExp('swim', 45);
+        this.setMessage(`🌊 ${companion.name} ate a Swim Fruit! Swim EXP +45!`);
         break;
       case 'flyFruit':
-        companion.flyStat = Math.min(99, companion.flyStat + 4);
-        this.setMessage(`🪽 ${companion.name} ate a Fly Fruit! Fly Stat +4!`);
+        this.gainStatExp('fly', 45);
+        this.setMessage(`🪽 ${companion.name} ate a Fly Fruit! Fly EXP +45!`);
         break;
       case 'runFruit':
-        companion.runStat = Math.min(99, companion.runStat + 4);
-        this.setMessage(`🏃 ${companion.name} ate a Run Fruit! Run Stat +4!`);
+        this.gainStatExp('run', 45);
+        this.setMessage(`🏃 ${companion.name} ate a Run Fruit! Run EXP +45!`);
         break;
       case 'powerFruit':
-        companion.powerStat = Math.min(99, companion.powerStat + 4);
-        this.setMessage(`💪 ${companion.name} ate a Power Fruit! Power Stat +4!`);
+        this.gainStatExp('power', 45);
+        this.setMessage(`💪 ${companion.name} ate a Power Fruit! Power EXP +45!`);
         break;
       case 'staminaFruit':
-        companion.staminaStat = Math.min(99, companion.staminaStat + 4);
-        this.setMessage(`⚡ ${companion.name} ate a Stamina Fruit! Stamina Stat +4!`);
+        this.gainStatExp('stamina', 45);
+        this.setMessage(`⚡ ${companion.name} ate a Stamina Fruit! Stamina EXP +45!`);
         break;
       case 'heroFruit':
-        companion.alignmentScore = Math.min(100, companion.alignmentScore + 25);
-        if (companion.alignmentScore > 20) companion.alignment = 'HERO';
-        this.setMessage(`😇 ${companion.name} ate a Hero Fruit! Halo and Angelic wings glowing!`);
+        companion.alignmentScore = Math.min(100, companion.alignmentScore + 30);
+        if (companion.alignmentScore > 15) {
+          companion.alignment = 'HERO';
+          companion.species = 'Hero Chao Solander';
+        }
+        this.setMessage(`😇 ${companion.name} ate a Hero Fruit! Angelic halo glowing brightly!`);
         break;
       case 'darkFruit':
-        companion.alignmentScore = Math.max(-100, companion.alignmentScore - 25);
-        if (companion.alignmentScore < -20) companion.alignment = 'DARK';
-        this.setMessage(`😈 ${companion.name} ate a Dark Fruit! Horns and Dark aura expanding!`);
+        companion.alignmentScore = Math.max(-100, companion.alignmentScore - 30);
+        if (companion.alignmentScore < -15) {
+          companion.alignment = 'DARK';
+          companion.species = 'Dark Chao Solander';
+        }
+        this.setMessage(`😈 ${companion.name} ate a Dark Fruit! Spiked devil horns & dark aura expanding!`);
         break;
     }
 
     this.notify();
     return true;
+  }
+
+  public equipAccessory(creatureId: string, accessoryId: string | null) {
+    const creature = this.getCreature(creatureId);
+    if (creature) {
+      creature.activeAccessory = accessoryId;
+      this.notify();
+    }
   }
 
   public trainClassroomSkill(skill: 'dancing' | 'singing' | 'drawing') {
@@ -403,10 +503,20 @@ export class SaveSystem {
       alignment: 'NEUTRAL',
       alignmentScore: 0,
       swimStat: Math.min(99, Math.round((p1.swimStat + p2.swimStat) / 2 + 5)),
+      swimLv: 1,
+      swimExp: 0,
       flyStat: Math.min(99, Math.round((p1.flyStat + p2.flyStat) / 2 + 5)),
+      flyLv: 1,
+      flyExp: 0,
       runStat: Math.min(99, Math.round((p1.runStat + p2.runStat) / 2 + 5)),
+      runLv: 1,
+      runExp: 0,
       powerStat: Math.min(99, Math.round((p1.powerStat + p2.powerStat) / 2 + 5)),
+      powerLv: 1,
+      powerExp: 0,
       staminaStat: Math.min(99, Math.round((p1.staminaStat + p2.staminaStat) / 2 + 5)),
+      staminaLv: 1,
+      staminaExp: 0,
       dancingSkill: Math.round((p1.dancingSkill + p2.dancingSkill) / 2),
       singingSkill: Math.round((p1.singingSkill + p2.singingSkill) / 2),
       drawingSkill: Math.round((p1.drawingSkill + p2.drawingSkill) / 2),
@@ -481,10 +591,20 @@ export class SaveSystem {
         alignment: 'NEUTRAL',
         alignmentScore: 0,
         swimStat: 18,
+        swimLv: 1,
+        swimExp: 0,
         flyStat: 18,
+        flyLv: 1,
+        flyExp: 0,
         runStat: 18,
+        runLv: 1,
+        runExp: 0,
         powerStat: 18,
+        powerLv: 1,
+        powerExp: 0,
         staminaStat: 18,
+        staminaLv: 1,
+        staminaExp: 0,
         dancingSkill: 0,
         singingSkill: 0,
         drawingSkill: 0,
