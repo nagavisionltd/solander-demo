@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { MYSTIC_VALLEY, GAME_LOOP } from '../constants';
 
 export interface DiscoveryPoint {
   id: string;
@@ -203,31 +204,31 @@ export class MysticValleyWorld {
   private buildTronTrackGeometry() {
     // Dark Glossy Metallic Tron Base Material
     const darkFloorMat = new THREE.MeshStandardMaterial({
-      color: 0x030712,
-      roughness: 0.15,
-      metalness: 0.85
+      color: MYSTIC_VALLEY.TRON_BASE_COLOR,
+      roughness: MYSTIC_VALLEY.TRON_ROUGHNESS,
+      metalness: MYSTIC_VALLEY.TRON_METALNESS
     });
 
     // Neon Edge Materials
     const cyanLightMat = new THREE.MeshStandardMaterial({
-      color: 0x06b6d4,
-      emissive: 0x06b6d4,
-      emissiveIntensity: 1.2
+      color: MYSTIC_VALLEY.TRON_CYAN_LIGHT,
+      emissive: MYSTIC_VALLEY.TRON_CYAN_LIGHT,
+      emissiveIntensity: MYSTIC_VALLEY.TRON_EMISSIVE_INTENSITY
     });
     const magentaLightMat = new THREE.MeshStandardMaterial({
-      color: 0xd946ef,
-      emissive: 0xd946ef,
-      emissiveIntensity: 1.2
+      color: MYSTIC_VALLEY.TRON_MAGENTA_LIGHT,
+      emissive: MYSTIC_VALLEY.TRON_MAGENTA_LIGHT,
+      emissiveIntensity: MYSTIC_VALLEY.TRON_EMISSIVE_INTENSITY
     });
     const amberLightMat = new THREE.MeshStandardMaterial({
-      color: 0xf97316,
-      emissive: 0xf97316,
-      emissiveIntensity: 1.2
+      color: MYSTIC_VALLEY.TRON_AMBER_LIGHT,
+      emissive: MYSTIC_VALLEY.TRON_AMBER_LIGHT,
+      emissiveIntensity: MYSTIC_VALLEY.TRON_EMISSIVE_INTENSITY
     });
     const emeraldLightMat = new THREE.MeshStandardMaterial({
-      color: 0x10b981,
-      emissive: 0x10b981,
-      emissiveIntensity: 1.2
+      color: MYSTIC_VALLEY.TRON_EMERALD_LIGHT,
+      emissive: MYSTIC_VALLEY.TRON_EMERALD_LIGHT,
+      emissiveIntensity: MYSTIC_VALLEY.TRON_EMISSIVE_INTENSITY
     });
 
     // Helper to spawn a Tron Track Segment with Glowing Border Rails
@@ -242,99 +243,99 @@ export class MysticValleyWorld {
       const group = new THREE.Group();
 
       // Main Grid Slab
-      const slabGeo = new THREE.BoxGeometry(width, 0.4, length);
+      const slabGeo = new THREE.BoxGeometry(width, MYSTIC_VALLEY.TRON_FLOOR_THICKNESS, length);
       const slab = new THREE.Mesh(slabGeo, darkFloorMat);
       slab.receiveShadow = true;
       group.add(slab);
 
       // Glowing Side Light Strips
-      const railGeo = new THREE.BoxGeometry(0.5, 0.6, length);
+      const railGeo = new THREE.BoxGeometry(MYSTIC_VALLEY.TRON_RAIL_WIDTH, MYSTIC_VALLEY.TRON_RAIL_HEIGHT, length);
       const leftRail = new THREE.Mesh(railGeo, lightMat);
-      leftRail.position.set(-width / 2 + 0.25, 0.2, 0);
+      leftRail.position.set(-width / 2 + MYSTIC_VALLEY.TRON_RAIL_WIDTH / 2, MYSTIC_VALLEY.TRON_RAIL_HEIGHT / 2 - 0.1, 0);
 
       const rightRail = new THREE.Mesh(railGeo, lightMat);
-      rightRail.position.set(width / 2 - 0.25, 0.2, 0);
+      rightRail.position.set(width / 2 - MYSTIC_VALLEY.TRON_RAIL_WIDTH / 2, MYSTIC_VALLEY.TRON_RAIL_HEIGHT / 2 - 0.1, 0);
 
       group.add(leftRail, rightRail);
       group.position.set(posX, posY, posZ);
       this.group.add(group);
     };
 
-    // 1. START HIGHWAY (Z = 20 to -220)
-    createTronSegment(32, 240, 0, -0.2, -100, cyanLightMat);
+    // 1. START HIGHWAY (Z = TRON_START_Z to TRON_FORK1_START_Z)
+    createTronSegment(MYSTIC_VALLEY.TRON_TRACK_WIDTH_START, 240, 0, -0.2, -100, cyanLightMat);
 
-    // 2. FORK 1 BRANCHES (Z = -220 to -680)
+    // 2. FORK 1 BRANCHES (Z = TRON_FORK1_START_Z to TRON_FORK1_END_Z)
     // Left Path (Magenta Light Rails)
-    for (let z = -250; z >= -650; z -= 50) {
-      let x = -38;
-      if (z > -310) x = ((-250 - z) / 60) * -38;
-      else if (z < -590) x = -38 + ((-590 - z) / 60) * 38;
+    for (let z = MYSTIC_VALLEY.TRON_FORK1_START_Z - 30; z >= MYSTIC_VALLEY.TRON_FORK1_END_Z + 30; z -= MYSTIC_VALLEY.TRON_SEGMENT_SPACING) {
+      let x = -MYSTIC_VALLEY.TRON_FORK1_SPLIT_DISTANCE;
+      if (z > MYSTIC_VALLEY.TRON_FORK1_START_Z + 60) x = ((MYSTIC_VALLEY.TRON_FORK1_START_Z + 30 - z) / 60) * -MYSTIC_VALLEY.TRON_FORK1_SPLIT_DISTANCE;
+      else if (z < MYSTIC_VALLEY.TRON_FORK1_END_Z + 90) x = -MYSTIC_VALLEY.TRON_FORK1_SPLIT_DISTANCE + ((MYSTIC_VALLEY.TRON_FORK1_END_Z + 90 - z) / 60) * MYSTIC_VALLEY.TRON_FORK1_SPLIT_DISTANCE;
 
       const y = Math.sin((z + 220) * 0.01) * 2.5;
-      createTronSegment(26, 52, x, y - 0.2, z, magentaLightMat);
+      createTronSegment(MYSTIC_VALLEY.TRON_LANE_WIDTH, MYSTIC_VALLEY.TRON_SEGMENT_LENGTH, x, y - 0.2, z, magentaLightMat);
     }
 
     // Right Path (Amber Light Rails)
-    for (let z = -250; z >= -650; z -= 50) {
-      let x = 38;
-      if (z > -310) x = ((-250 - z) / 60) * 38;
-      else if (z < -590) x = 38 + ((-590 - z) / 60) * -38;
+    for (let z = MYSTIC_VALLEY.TRON_FORK1_START_Z - 30; z >= MYSTIC_VALLEY.TRON_FORK1_END_Z + 30; z -= MYSTIC_VALLEY.TRON_SEGMENT_SPACING) {
+      let x = MYSTIC_VALLEY.TRON_FORK1_SPLIT_DISTANCE;
+      if (z > MYSTIC_VALLEY.TRON_FORK1_START_Z + 60) x = ((MYSTIC_VALLEY.TRON_FORK1_START_Z + 30 - z) / 60) * MYSTIC_VALLEY.TRON_FORK1_SPLIT_DISTANCE;
+      else if (z < MYSTIC_VALLEY.TRON_FORK1_END_Z + 90) x = MYSTIC_VALLEY.TRON_FORK1_SPLIT_DISTANCE + ((MYSTIC_VALLEY.TRON_FORK1_END_Z + 90 - z) / 60) * -MYSTIC_VALLEY.TRON_FORK1_SPLIT_DISTANCE;
 
       const y = Math.cos((z + 220) * 0.01) * 2.5;
-      createTronSegment(26, 52, x, y - 0.2, z, amberLightMat);
+      createTronSegment(MYSTIC_VALLEY.TRON_LANE_WIDTH, MYSTIC_VALLEY.TRON_SEGMENT_LENGTH, x, y - 0.2, z, amberLightMat);
     }
 
-    // 3. CHECKPOINT HIGHWAY (Z = -680 to -920)
-    createTronSegment(36, 240, 0, 1.8, -800, cyanLightMat);
+    // 3. CHECKPOINT HIGHWAY (Z = TRON_FORK1_END_Z to TRON_FORK2_START_Z)
+    createTronSegment(MYSTIC_VALLEY.TRON_TRACK_WIDTH_CHECKPOINT, 240, 0, 1.8, -800, cyanLightMat);
 
-    // 4. FORK 2 BRANCHES (Z = -920 to -1580)
+    // 4. FORK 2 BRANCHES (Z = TRON_FORK2_START_Z to TRON_FORK2_END_Z)
     // Short Path (Left Branch - High-Speed Cyan Light Rails)
-    for (let z = -950; z >= -1380; z -= 50) {
-      let x = -32;
-      if (z > -1010) x = ((-950 - z) / 60) * -32;
-      else if (z < -1320) x = -32 + ((-1320 - z) / 60) * 32;
+    for (let z = MYSTIC_VALLEY.TRON_FORK2_START_Z - 30; z >= MYSTIC_VALLEY.TRON_FORK2_END_Z + 260; z -= MYSTIC_VALLEY.TRON_SEGMENT_SPACING) {
+      let x = MYSTIC_VALLEY.TRON_SHORT_PATH_X;
+      if (z > MYSTIC_VALLEY.TRON_FORK2_START_Z + 60) x = ((MYSTIC_VALLEY.TRON_FORK2_START_Z + 30 - z) / 60) * MYSTIC_VALLEY.TRON_SHORT_PATH_X;
+      else if (z < MYSTIC_VALLEY.TRON_FORK2_END_Z + 260) x = MYSTIC_VALLEY.TRON_SHORT_PATH_X + ((MYSTIC_VALLEY.TRON_FORK2_END_Z + 260 - z) / 60) * -MYSTIC_VALLEY.TRON_SHORT_PATH_X;
 
       const y = 2.0 + Math.sin((z + 920) * 0.015) * 3.5;
-      createTronSegment(24, 52, x, y - 0.2, z, cyanLightMat);
+      createTronSegment(MYSTIC_VALLEY.TRON_SHORT_LANE_WIDTH, MYSTIC_VALLEY.TRON_SEGMENT_LENGTH, x, y - 0.2, z, cyanLightMat);
     }
 
     // Long Path (Right Branch - Emerald Scenic Curve)
-    for (let z = -950; z >= -1550; z -= 50) {
-      let x = 55.0 * Math.sin(((-920 - z) / 600.0) * Math.PI);
-      if (z > -1010) x = ((-950 - z) / 60) * 45;
-      else if (z < -1490) x = 45 * (1 - (-1490 - z) / 60);
+    for (let z = MYSTIC_VALLEY.TRON_FORK2_START_Z - 30; z >= MYSTIC_VALLEY.TRON_FORK2_END_Z - 30; z -= MYSTIC_VALLEY.TRON_SEGMENT_SPACING) {
+      let x = MYSTIC_VALLEY.TRON_LONG_PATH_MAX_X * Math.sin(((-920 - z) / 600.0) * Math.PI);
+      if (z > MYSTIC_VALLEY.TRON_FORK2_START_Z + 60) x = ((MYSTIC_VALLEY.TRON_FORK2_START_Z + 30 - z) / 60) * 45;
+      else if (z < MYSTIC_VALLEY.TRON_FORK2_END_Z + 60) x = 45 * (1 - (MYSTIC_VALLEY.TRON_FORK2_END_Z + 60 - z) / 60);
 
       const y = 2.0 + Math.cos((z + 920) * 0.01) * 3.0;
-      createTronSegment(28, 52, x, y - 0.2, z, emeraldLightMat);
+      createTronSegment(MYSTIC_VALLEY.TRON_LONG_LANE_WIDTH, MYSTIC_VALLEY.TRON_SEGMENT_LENGTH, x, y - 0.2, z, emeraldLightMat);
     }
 
-    // 5. GOAL HIGHWAY (Z = -1580 to -1820)
-    createTronSegment(40, 240, 0, 3.8, -1700, cyanLightMat);
+    // 5. GOAL HIGHWAY (Z = TRON_FORK2_END_Z to TRON_END_Z)
+    createTronSegment(MYSTIC_VALLEY.TRON_TRACK_WIDTH_GOAL, 240, 0, 3.8, -1700, cyanLightMat);
   }
 
   private buildOriginalValleyTerrain() {
-    const canyonMat = new THREE.MeshToonMaterial({ color: 0x1e1b4b });
+    const canyonMat = new THREE.MeshToonMaterial({ color: MYSTIC_VALLEY.VALLEY_CANYON_COLOR });
     const crystalRimMat = new THREE.MeshStandardMaterial({
-      color: 0xc084fc,
-      emissive: 0x9333ea,
-      emissiveIntensity: 0.6
+      color: MYSTIC_VALLEY.VALLEY_CRYSTAL_COLOR,
+      emissive: MYSTIC_VALLEY.VALLEY_CRYSTAL_EMISSIVE,
+      emissiveIntensity: MYSTIC_VALLEY.VALLEY_CRYSTAL_EMISSIVE_INTENSITY
     });
 
-    // Build serpentine 2500-unit mountain valley track
-    for (let z = 20; z >= -2500; z -= 30) {
+    // Build serpentine valley track from VALLEY_START_Z to VALLEY_END_Z
+    for (let z = MYSTIC_VALLEY.VALLEY_START_Z; z >= MYSTIC_VALLEY.VALLEY_END_Z; z -= MYSTIC_VALLEY.VALLEY_SEGMENT_SPACING) {
       const dist = Math.max(0, -z);
       const centerX = Math.sin(dist * 0.008) * 45.0 + Math.sin(dist * 0.02) * 20.0;
       const centerY = Math.sin(dist * 0.006) * 12.0 + Math.cos(dist * 0.015) * 6.0;
 
-      const segGeo = new THREE.BoxGeometry(70, 2.0, 32);
+      const segGeo = new THREE.BoxGeometry(MYSTIC_VALLEY.VALLEY_TRACK_WIDTH, MYSTIC_VALLEY.VALLEY_TRACK_HEIGHT, MYSTIC_VALLEY.VALLEY_SEGMENT_LENGTH);
       const seg = new THREE.Mesh(segGeo, canyonMat);
       seg.position.set(centerX, centerY - 1.0, z);
       seg.receiveShadow = true;
       this.group.add(seg);
 
       // Bioluminescent Crystal Border Rails along path edges
-      [-34, 34].forEach(offset => {
-        const borderGeo = new THREE.BoxGeometry(2.0, 1.2, 32);
+      [-MYSTIC_VALLEY.VALLEY_CRYSTAL_RIM_OFFSET, MYSTIC_VALLEY.VALLEY_CRYSTAL_RIM_OFFSET].forEach(offset => {
+        const borderGeo = new THREE.BoxGeometry(MYSTIC_VALLEY.VALLEY_CRYSTAL_RIM_WIDTH, MYSTIC_VALLEY.VALLEY_CRYSTAL_RIM_HEIGHT, MYSTIC_VALLEY.VALLEY_SEGMENT_LENGTH);
         const border = new THREE.Mesh(borderGeo, crystalRimMat);
         border.position.set(centerX + offset, centerY + 0.6, z);
         this.group.add(border);
@@ -344,24 +345,35 @@ export class MysticValleyWorld {
 
   private buildOriginalValleyScenery() {
     // Bioluminescent Valley Scenery (Crystal Trees, Glowing Minerals, Sky Islands)
-    const treeTrunkMat = new THREE.MeshToonMaterial({ color: 0x311b92 });
+    const treeTrunkMat = new THREE.MeshToonMaterial({ color: MYSTIC_VALLEY.VALLEY_TREE_TRUNK_COLOR });
     const treeFoliageMat = new THREE.MeshStandardMaterial({
-      color: 0xa855f7,
-      emissive: 0x7e22ce,
-      emissiveIntensity: 0.7
+      color: MYSTIC_VALLEY.VALLEY_TREE_FOLIAGE_COLOR,
+      emissive: MYSTIC_VALLEY.VALLEY_TREE_FOLIAGE_EMISSIVE,
+      emissiveIntensity: MYSTIC_VALLEY.VALLEY_TREE_FOLIAGE_EMISSIVE_INTENSITY
     });
 
-    for (let z = 0; z >= -2400; z -= 60) {
+    for (let z = MYSTIC_VALLEY.VALLEY_START_Z; z >= MYSTIC_VALLEY.VALLEY_END_Z + 100; z -= MYSTIC_VALLEY.VALLEY_TREE_SPACING) {
       const dist = Math.max(0, -z);
       const centerX = Math.sin(dist * 0.008) * 45.0 + Math.sin(dist * 0.02) * 20.0;
       const centerY = Math.sin(dist * 0.006) * 12.0 + Math.cos(dist * 0.015) * 6.0;
 
-      [-42, 42].forEach(side => {
+      [-MYSTIC_VALLEY.VALLEY_TREE_SIDE_OFFSET, MYSTIC_VALLEY.VALLEY_TREE_SIDE_OFFSET].forEach(side => {
         const treeGroup = new THREE.Group();
-        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 7.0, 8), treeTrunkMat);
-        trunk.position.y = 3.5;
-        const foliage = new THREE.Mesh(new THREE.IcosahedronGeometry(3.5, 1), treeFoliageMat);
-        foliage.position.y = 8.0;
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(
+            MYSTIC_VALLEY.VALLEY_TREE_TRUNK_RADIUS_TOP,
+            MYSTIC_VALLEY.VALLEY_TREE_TRUNK_RADIUS_BOTTOM,
+            MYSTIC_VALLEY.VALLEY_TREE_TRUNK_HEIGHT,
+            8
+          ),
+          treeTrunkMat
+        );
+        trunk.position.y = MYSTIC_VALLEY.VALLEY_TREE_TRUNK_HEIGHT / 2;
+        const foliage = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(MYSTIC_VALLEY.VALLEY_TREE_FOLIAGE_RADIUS, 1),
+          treeFoliageMat
+        );
+        foliage.position.y = MYSTIC_VALLEY.VALLEY_TREE_TRUNK_HEIGHT + MYSTIC_VALLEY.VALLEY_TREE_FOLIAGE_RADIUS / 2;
 
         treeGroup.add(trunk, foliage);
         treeGroup.position.set(centerX + side, centerY, z);
@@ -372,18 +384,22 @@ export class MysticValleyWorld {
 
   private buildTronSceneryAndArches() {
     // 1. Digital Wireframe Cyber Pillars along the void sides
-    const pillarGeo = new THREE.BoxGeometry(3, 30, 3);
+    const pillarGeo = new THREE.BoxGeometry(
+      MYSTIC_VALLEY.TRON_PILLAR_WIDTH,
+      MYSTIC_VALLEY.TRON_PILLAR_HEIGHT,
+      MYSTIC_VALLEY.TRON_PILLAR_WIDTH
+    );
     const pillarMat = new THREE.MeshStandardMaterial({
-      color: 0x0284c7,
-      emissive: 0x0369a1,
+      color: MYSTIC_VALLEY.TRON_WIREFRAME_COLOR,
+      emissive: MYSTIC_VALLEY.TRON_WIREFRAME_COLOR,
       emissiveIntensity: 0.6,
       wireframe: true
     });
 
-    for (let z = 20; z >= -1800; z -= 80) {
-      [-65, 65].forEach(sideX => {
+    for (let z = MYSTIC_VALLEY.TRON_START_Z; z >= MYSTIC_VALLEY.TRON_END_Z + 20; z -= MYSTIC_VALLEY.TRON_PILLAR_SPACING) {
+      [-MYSTIC_VALLEY.TRON_PILLAR_SIDE_OFFSET, MYSTIC_VALLEY.TRON_PILLAR_SIDE_OFFSET].forEach(sideX => {
         const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-        pillar.position.set(sideX, 10, z);
+        pillar.position.set(sideX, MYSTIC_VALLEY.TRON_PILLAR_HEIGHT / 3, z);
         this.group.add(pillar);
       });
     }
@@ -398,14 +414,23 @@ export class MysticValleyWorld {
         emissiveIntensity: 0.9
       });
 
-      const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 12), pillarMat);
-      leftPillar.position.set(-18, 6, 0);
+      const leftPillar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 0.4, MYSTIC_VALLEY.TRON_ARCHWAY_PILLAR_HEIGHT),
+        pillarMat
+      );
+      leftPillar.position.set(-MYSTIC_VALLEY.TRON_ARCHWAY_WIDTH / 2, MYSTIC_VALLEY.TRON_ARCHWAY_PILLAR_HEIGHT / 2, 0);
 
-      const rightPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 12), pillarMat);
-      rightPillar.position.set(18, 6, 0);
+      const rightPillar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 0.4, MYSTIC_VALLEY.TRON_ARCHWAY_PILLAR_HEIGHT),
+        pillarMat
+      );
+      rightPillar.position.set(MYSTIC_VALLEY.TRON_ARCHWAY_WIDTH / 2, MYSTIC_VALLEY.TRON_ARCHWAY_PILLAR_HEIGHT / 2, 0);
 
-      const headerBar = new THREE.Mesh(new THREE.BoxGeometry(36, 0.6, 0.6), pillarMat);
-      headerBar.position.set(0, 11.8, 0);
+      const headerBar = new THREE.Mesh(
+        new THREE.BoxGeometry(MYSTIC_VALLEY.TRON_ARCHWAY_WIDTH, 0.6, 0.6),
+        pillarMat
+      );
+      headerBar.position.set(0, MYSTIC_VALLEY.TRON_ARCHWAY_HEADER_HEIGHT, 0);
 
       group.add(leftPillar, rightPillar, headerBar);
       group.position.set(x, y, z);
@@ -413,32 +438,49 @@ export class MysticValleyWorld {
     };
 
     // Spawn Tron Archways at key junctions
-    createArchway(10, 0, 0, 0x06b6d4, 'START LINE');
-    createArchway(-210, 0, 0, 0xd946ef, 'FORK 1: LEFT vs RIGHT');
-    createArchway(-910, 0, 2, 0x10b981, 'FORK 2: SHORT vs LONG');
+    createArchway(10, 0, 0, MYSTIC_VALLEY.TRON_CYAN_LIGHT, 'START LINE');
+    createArchway(MYSTIC_VALLEY.TRON_FORK1_START_Z - 10, 0, 0, MYSTIC_VALLEY.TRON_MAGENTA_LIGHT, 'FORK 1: LEFT vs RIGHT');
+    createArchway(MYSTIC_VALLEY.TRON_FORK2_START_Z + 10, 0, 2, MYSTIC_VALLEY.TRON_EMERALD_LIGHT, 'FORK 2: SHORT vs LONG');
 
     // 3. TRON CHECKPOINT GATE at Z = -800
     const cpGroup = new THREE.Group();
     const cpMat = new THREE.MeshStandardMaterial({
-      color: 0x06b6d4,
-      emissive: 0x06b6d4,
+      color: MYSTIC_VALLEY.CHECKPOINT_COLOR,
+      emissive: MYSTIC_VALLEY.CHECKPOINT_COLOR,
       emissiveIntensity: 1.5
     });
 
-    const cpLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 14), cpMat);
-    cpLeft.position.set(-14, 7, 0);
+    const cpLeft = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        MYSTIC_VALLEY.CHECKPOINT_PILLAR_RADIUS,
+        MYSTIC_VALLEY.CHECKPOINT_PILLAR_RADIUS,
+        MYSTIC_VALLEY.CHECKPOINT_PILLAR_HEIGHT
+      ),
+      cpMat
+    );
+    cpLeft.position.set(-MYSTIC_VALLEY.CHECKPOINT_WIDTH / 2, MYSTIC_VALLEY.CHECKPOINT_PILLAR_HEIGHT / 2, 0);
 
-    const cpRight = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 14), cpMat);
-    cpRight.position.set(14, 7, 0);
+    const cpRight = new THREE.Mesh(
+      new THREE.CylinderGeometry(
+        MYSTIC_VALLEY.CHECKPOINT_PILLAR_RADIUS,
+        MYSTIC_VALLEY.CHECKPOINT_PILLAR_RADIUS,
+        MYSTIC_VALLEY.CHECKPOINT_PILLAR_HEIGHT
+      ),
+      cpMat
+    );
+    cpRight.position.set(MYSTIC_VALLEY.CHECKPOINT_WIDTH / 2, MYSTIC_VALLEY.CHECKPOINT_PILLAR_HEIGHT / 2, 0);
 
-    const cpHeader = new THREE.Mesh(new THREE.BoxGeometry(28, 1.2, 1.2), cpMat);
-    cpHeader.position.set(0, 13.5, 0);
+    const cpHeader = new THREE.Mesh(
+      new THREE.BoxGeometry(MYSTIC_VALLEY.CHECKPOINT_WIDTH, 1.2, 1.2),
+      cpMat
+    );
+    cpHeader.position.set(0, MYSTIC_VALLEY.CHECKPOINT_HEADER_HEIGHT, 0);
 
     // Scanner beam curtain
     const beamMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
+      color: MYSTIC_VALLEY.CHECKPOINT_BEAM_COLOR,
       transparent: true,
-      opacity: 0.35,
+      opacity: MYSTIC_VALLEY.TRON_CHECKPOINT_BEAM_OPACITY,
       side: THREE.DoubleSide
     });
     const beamMesh = new THREE.Mesh(new THREE.PlaneGeometry(26, 12), beamMat);
@@ -459,18 +501,18 @@ export class MysticValleyWorld {
   private buildDiscoveryPoints() {
     // Tron Memory Core Landmark at Z = -500
     const crystalGroup = new THREE.Group();
-    const coreGeo = new THREE.OctahedronGeometry(2.8, 0);
+    const coreGeo = new THREE.OctahedronGeometry(MYSTIC_VALLEY.DISCOVERY_POINT_CORE_RADIUS, 0);
     const coreMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      emissive: 0x0284c7,
-      emissiveIntensity: 1.0,
+      color: MYSTIC_VALLEY.DISCOVERY_POINT_CORE_COLOR,
+      emissive: MYSTIC_VALLEY.DISCOVERY_POINT_CORE_EMISSIVE,
+      emissiveIntensity: MYSTIC_VALLEY.DISCOVERY_POINT_CORE_EMISSIVE_INTENSITY,
       wireframe: true
     });
     const core = new THREE.Mesh(coreGeo, coreMat);
     core.position.y = 4.0;
 
     crystalGroup.add(core);
-    const pos = new THREE.Vector3(-38, 2.0, -500); // Left path discovery core
+    const pos = new THREE.Vector3(-MYSTIC_VALLEY.TRON_FORK1_SPLIT_DISTANCE, 2.0, -500); // Left path discovery core
     crystalGroup.position.copy(pos);
     this.group.add(crystalGroup);
 
@@ -486,19 +528,19 @@ export class MysticValleyWorld {
   }
 
   private buildResourceNodes() {
-    const essenceGeo = new THREE.OctahedronGeometry(0.45, 0);
+    const essenceGeo = new THREE.OctahedronGeometry(MYSTIC_VALLEY.RESOURCE_ESSENCE_SIZE, 0);
     const essenceMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      emissive: 0x0284c7,
-      emissiveIntensity: 0.9
+      color: MYSTIC_VALLEY.RESOURCE_ESSENCE_COLOR,
+      emissive: MYSTIC_VALLEY.RESOURCE_ESSENCE_EMISSIVE,
+      emissiveIntensity: MYSTIC_VALLEY.RESOURCE_ESSENCE_EMISSIVE_INTENSITY
     });
 
-    for (let z = 0; z >= -1700; z -= 45) {
+    for (let z = MYSTIC_VALLEY.VALLEY_START_Z; z >= MYSTIC_VALLEY.TRON_END_Z + 120; z -= MYSTIC_VALLEY.RESOURCE_SPAWN_SPACING) {
       const h = this.getGroundHeight(0, z);
       if (h > -5.0) {
         const g = new THREE.Group();
         const m = new THREE.Mesh(essenceGeo, essenceMat);
-        m.position.y = 0.8;
+        m.position.y = MYSTIC_VALLEY.RESOURCE_HEIGHT_OFFSET;
         g.add(m);
 
         const pos = new THREE.Vector3(0, h + 0.2, z);
@@ -519,8 +561,13 @@ export class MysticValleyWorld {
 
   private buildTrialPedestal() {
     const group = new THREE.Group();
-    const baseGeo = new THREE.CylinderGeometry(1.8, 2.2, 0.6, 16);
-    const baseMat = new THREE.MeshToonMaterial({ color: 0x0f172a });
+    const baseGeo = new THREE.CylinderGeometry(
+      MYSTIC_VALLEY.TRIAL_PEDESTAL_RADIUS,
+      MYSTIC_VALLEY.TRIAL_PEDESTAL_RADIUS + 0.4,
+      0.6,
+      16
+    );
+    const baseMat = new THREE.MeshToonMaterial({ color: MYSTIC_VALLEY.TRIAL_PEDESTAL_COLOR });
     const base = new THREE.Mesh(baseGeo, baseMat);
     base.position.y = 0.3;
 
@@ -537,23 +584,23 @@ export class MysticValleyWorld {
       -180, -380, -550, -840, -1120, -1450, -1650
     ];
 
-    const bodyGeo = new THREE.OctahedronGeometry(0.9, 0);
-    const bodyMat = new THREE.MeshToonMaterial({ color: 0x0f172a });
-    const eyeGeo = new THREE.SphereGeometry(0.2, 12, 12);
+    const bodyGeo = new THREE.OctahedronGeometry(MYSTIC_VALLEY.ENEMY_BODY_RADIUS, 0);
+    const bodyMat = new THREE.MeshToonMaterial({ color: MYSTIC_VALLEY.ENEMY_COLOR });
+    const eyeGeo = new THREE.SphereGeometry(MYSTIC_VALLEY.ENEMY_EYE_RADIUS, 12, 12);
     const eyeMat = new THREE.MeshStandardMaterial({
-      color: 0xef4444,
-      emissive: 0xef4444,
-      emissiveIntensity: 1.0
+      color: MYSTIC_VALLEY.ENEMY_EYE_COLOR,
+      emissive: MYSTIC_VALLEY.ENEMY_EYE_EMISSIVE,
+      emissiveIntensity: MYSTIC_VALLEY.ENEMY_EYE_EMISSIVE_INTENSITY
     });
 
     enemyZList.forEach((z, idx) => {
       const h = this.getGroundHeight(0, z);
       const g = new THREE.Group();
       const body = new THREE.Mesh(bodyGeo, bodyMat);
-      body.position.y = 0.9;
+      body.position.y = MYSTIC_VALLEY.ENEMY_BODY_RADIUS;
 
       const eye = new THREE.Mesh(eyeGeo, eyeMat);
-      eye.position.set(0, 0.95, 0.65);
+      eye.position.set(0, MYSTIC_VALLEY.ENEMY_EYE_RADIUS + 0.05, 0.65);
 
       g.add(body, eye);
 
@@ -566,8 +613,8 @@ export class MysticValleyWorld {
         position: pos,
         velocity: new THREE.Vector3(),
         mesh: g,
-        hp: 2,
-        maxHp: 2,
+        hp: MYSTIC_VALLEY.ENEMY_HP_BASE - 1,
+        maxHp: MYSTIC_VALLEY.ENEMY_HP_BASE - 1,
         alive: true,
         eyeMesh: eye
       });
@@ -602,14 +649,14 @@ export class MysticValleyWorld {
 
   private buildSonicCourse() {
     // 1. DASH PANELS
-    const arrowGeo = new THREE.ConeGeometry(0.9, 2.0, 3);
+    const arrowGeo = new THREE.ConeGeometry(0.9, MYSTIC_VALLEY.DASH_PANEL_LENGTH / 2, 3);
     arrowGeo.rotateX(Math.PI / 2);
     const arrowMat = new THREE.MeshStandardMaterial({
-      color: 0x06b6d4,
-      emissive: 0x06b6d4,
+      color: MYSTIC_VALLEY.DASH_PANEL_ARROW_COLOR,
+      emissive: MYSTIC_VALLEY.DASH_PANEL_GLOW_COLOR,
       emissiveIntensity: 1.2
     });
-    const panelBaseGeo = new THREE.BoxGeometry(2.4, 0.1, 3.0);
+    const panelBaseGeo = new THREE.BoxGeometry(MYSTIC_VALLEY.DASH_PANEL_WIDTH, MYSTIC_VALLEY.DASH_PANEL_HEIGHT, MYSTIC_VALLEY.DASH_PANEL_LENGTH);
     const panelBaseMat = new THREE.MeshToonMaterial({ color: 0x0f172a });
 
     const dashZList = [-80, -320, -520, -740, -1020, -1250, -1620];
@@ -618,13 +665,13 @@ export class MysticValleyWorld {
       const h = this.getGroundHeight(0, z);
       const g = new THREE.Group();
       const base = new THREE.Mesh(panelBaseGeo, panelBaseMat);
-      base.position.y = 0.05;
+      base.position.y = MYSTIC_VALLEY.DASH_PANEL_HEIGHT / 2;
       const arrow = new THREE.Mesh(arrowGeo, arrowMat);
-      arrow.position.set(0, 0.14, 0);
+      arrow.position.set(0, MYSTIC_VALLEY.DASH_PANEL_HEIGHT + 0.04, 0);
 
       g.add(base, arrow);
 
-      const pos = new THREE.Vector3(0, h + 0.05, z);
+      const pos = new THREE.Vector3(0, h + MYSTIC_VALLEY.DASH_PANEL_HEIGHT / 2, z);
       g.position.copy(pos);
       this.group.add(g);
 
@@ -638,10 +685,27 @@ export class MysticValleyWorld {
     });
 
     // 2. SPRING LAUNCH PADS
-    const coilGeo = new THREE.CylinderGeometry(0.85, 0.95, 0.45, 16);
-    const coilMat = new THREE.MeshStandardMaterial({ color: 0xd946ef, roughness: 0.2 });
-    const topCapGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.1, 16);
-    const topCapMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.8 });
+    const coilGeo = new THREE.CylinderGeometry(
+      MYSTIC_VALLEY.SPRING_PAD_RADIUS - 0.1,
+      MYSTIC_VALLEY.SPRING_PAD_RADIUS,
+      0.45,
+      16
+    );
+    const coilMat = new THREE.MeshStandardMaterial({
+      color: MYSTIC_VALLEY.SPRING_PAD_COLOR,
+      roughness: 0.2
+    });
+    const topCapGeo = new THREE.CylinderGeometry(
+      MYSTIC_VALLEY.SPRING_PAD_RADIUS,
+      MYSTIC_VALLEY.SPRING_PAD_RADIUS,
+      0.1,
+      16
+    );
+    const topCapMat = new THREE.MeshStandardMaterial({
+      color: MYSTIC_VALLEY.SPRING_PAD_RING_COLOR,
+      emissive: 0xca8a04,
+      emissiveIntensity: 0.8
+    });
 
     const springZList = [-420, -1180, -1480];
 
@@ -661,24 +725,29 @@ export class MysticValleyWorld {
       this.springPads.push({
         id: `spring_pad_${idx}`,
         position: pos,
-        upwardForce: 38,
-        forwardSpeed: 32,
+        upwardForce: MYSTIC_VALLEY.SPRING_PAD_UPWARD_FORCE,
+        forwardSpeed: MYSTIC_VALLEY.SPRING_PAD_FORWARD_SPEED,
         mesh: g,
         cooldowned: false
       });
     });
 
     // 3. SPEED RINGS
-    const ringGeo = new THREE.TorusGeometry(0.8, 0.12, 12, 24);
+    const ringGeo = new THREE.TorusGeometry(
+      MYSTIC_VALLEY.SPEED_RING_RADIUS,
+      MYSTIC_VALLEY.SPEED_RING_TUBE_RADIUS,
+      12,
+      24
+    );
     const ringMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15,
-      emissive: 0xca8a04,
-      emissiveIntensity: 0.85,
+      color: MYSTIC_VALLEY.SPEED_RING_COLOR,
+      emissive: MYSTIC_VALLEY.SPEED_RING_EMISSIVE,
+      emissiveIntensity: MYSTIC_VALLEY.SPEED_RING_EMISSIVE_INTENSITY,
       metalness: 0.9,
       roughness: 0.1
     });
 
-    for (let z = 0; z >= -1680; z -= 25) {
+    for (let z = MYSTIC_VALLEY.VALLEY_START_Z; z >= MYSTIC_VALLEY.TRON_END_Z + 140; z -= 25) {
       const h = this.getGroundHeight(0, z);
       if (h > -5.0) {
         const g = new THREE.Group();
@@ -700,11 +769,16 @@ export class MysticValleyWorld {
 
     // 4. TRON GOAL PORTAL AT FINISH LINE (Z = -1700)
     const goalGroup = new THREE.Group();
-    const goalRingGeo = new THREE.TorusGeometry(3.5, 0.4, 16, 32);
+    const goalRingGeo = new THREE.TorusGeometry(
+      MYSTIC_VALLEY.GOAL_RING_RADIUS,
+      0.4,
+      16,
+      32
+    );
     const goalRingMat = new THREE.MeshStandardMaterial({
-      color: 0x06b6d4,
-      emissive: 0x06b6d4,
-      emissiveIntensity: 1.5,
+      color: MYSTIC_VALLEY.GOAL_RING_COLOR,
+      emissive: MYSTIC_VALLEY.GOAL_RING_EMISSIVE,
+      emissiveIntensity: MYSTIC_VALLEY.GOAL_RING_EMISSIVE_INTENSITY,
       metalness: 0.9,
       roughness: 0.1
     });
