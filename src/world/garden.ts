@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GARDEN, GARDEN_EXTENDED, RENDERING } from '../constants';
 
 export interface SolanderEggMesh {
   id: string;
@@ -36,10 +37,20 @@ export class SolanderGardenWorld {
   public waterMesh!: THREE.Mesh;
   public smallWaterMesh!: THREE.Mesh;
   private waterfallStream!: THREE.Mesh;
-  public poolCenter: THREE.Vector3 = new THREE.Vector3(0, -0.2, -6.5);
-  public poolRadius: number = 13.5;
-  public smallPoolCenter: THREE.Vector3 = new THREE.Vector3(12.5, -0.2, 9.0);
-  public smallPoolRadius: number = 6.2;
+  
+  // Use constants for pool configuration
+  public poolCenter: THREE.Vector3 = new THREE.Vector3(
+    GARDEN.POOL_CENTER.x, 
+    GARDEN.POOL_CENTER.y, 
+    GARDEN.POOL_CENTER.z
+  );
+  public poolRadius: number = GARDEN.POOL_RADIUS;
+  public smallPoolCenter: THREE.Vector3 = new THREE.Vector3(
+    GARDEN.SMALL_POOL_CENTER.x,
+    GARDEN.SMALL_POOL_CENTER.y,
+    GARDEN.SMALL_POOL_CENTER.z
+  );
+  public smallPoolRadius: number = GARDEN.SMALL_POOL_RADIUS;
 
   constructor() {
     this.group = new THREE.Group();
@@ -53,30 +64,41 @@ export class SolanderGardenWorld {
     this.buildEggs();
     this.buildEtherealAtmosphere();
 
-    // Fireflies / Floating sparkles
+    // Fireflies using constants - optimized with instancing
+    this.fireflies = this.createFireflies();
+    this.group.add(this.fireflies);
+  }
+  
+  /**
+   * Create fireflies particle system using constants
+   */
+  private createFireflies(): THREE.Points {
     const particleGeo = new THREE.BufferGeometry();
-    const count = 60;
+    const count = GARDEN.FIREFLY_COUNT;
     const posArray = new Float32Array(count * 3);
+    
     for (let i = 0; i < count * 3; i += 3) {
-      posArray[i] = (Math.random() - 0.5) * 45;
-      posArray[i + 1] = 0.5 + Math.random() * 3.5;
-      posArray[i + 2] = (Math.random() - 0.5) * 45;
+      posArray[i] = (Math.random() - 0.5) * GARDEN_EXTENDED.FIREFLY_SPREAD;
+      posArray[i + 1] = GARDEN_EXTENDED.FIREFLY_Y_MIN + Math.random() * (GARDEN_EXTENDED.FIREFLY_Y_MAX - GARDEN_EXTENDED.FIREFLY_Y_MIN);
+      posArray[i + 2] = (Math.random() - 0.5) * GARDEN_EXTENDED.FIREFLY_SPREAD;
     }
+    
     particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+    
     const particleMat = new THREE.PointsMaterial({
-      color: 0xfacc15,
-      size: 0.15,
+      color: GARDEN_EXTENDED.FIREFLY_COLOR,
+      size: GARDEN_EXTENDED.FIREFLY_SIZE,
       transparent: true,
-      opacity: 0.8,
+      opacity: GARDEN_EXTENDED.FIREFLY_OPACITY,
       blending: THREE.AdditiveBlending
     });
-    this.fireflies = new THREE.Points(particleGeo, particleMat);
-    this.group.add(this.fireflies);
+    
+    return new THREE.Points(particleGeo, particleMat);
   }
 
   private buildEtherealAtmosphere() {
     // 1. VOLUMETRIC MIST PARTICLE SYSTEM AT WATERFALL BASE
-    const mistCount = 180;
+    const mistCount = GARDEN_EXTENDED.MIST_COUNT;
     const mistGeo = new THREE.BufferGeometry();
     const mistPos = new Float32Array(mistCount * 3);
     const mistScales = new Float32Array(mistCount);
@@ -108,11 +130,11 @@ export class SolanderGardenWorld {
     const softParticleTex = new THREE.CanvasTexture(canvas);
 
     const mistMat = new THREE.PointsMaterial({
-      color: 0xe0f2fe,
-      size: 0.88,
+      color: GARDEN_EXTENDED.MIST_COLOR,
+      size: GARDEN_EXTENDED.MIST_SIZE,
       map: softParticleTex,
       transparent: true,
-      opacity: 0.65,
+      opacity: GARDEN_EXTENDED.MIST_OPACITY,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
@@ -130,17 +152,17 @@ export class SolanderGardenWorld {
     this.group.add(this.waterfallMistLight2);
 
     // Billowing Mist Mesh Puffs
-    const puffGeo = new THREE.SphereGeometry(0.75, 12, 12);
+    const puffGeo = new THREE.SphereGeometry(GARDEN_EXTENDED.MIST_PUFF_SIZE, 12, 12);
     const puffMat = new THREE.MeshStandardMaterial({
-      color: 0xe0f2fe,
-      emissive: 0x0284c7,
-      emissiveIntensity: 0.1,
+      color: GARDEN_EXTENDED.MIST_PUFF_COLOR,
+      emissive: GARDEN_EXTENDED.MIST_PUFF_EMISSIVE,
+      emissiveIntensity: GARDEN_EXTENDED.MIST_PUFF_EMISSIVE_INTENSITY,
       transparent: true,
-      opacity: 0.2,
+      opacity: GARDEN_EXTENDED.MIST_PUFF_OPACITY,
       depthWrite: false
     });
 
-    for (let i = 0; i < 38; i++) {
+    for (let i = 0; i < GARDEN_EXTENDED.MIST_PUFF_COUNT; i++) {
       const puff = new THREE.Mesh(puffGeo, puffMat);
       puff.position.set(
         (Math.random() - 0.5) * 5.2,
@@ -160,9 +182,9 @@ export class SolanderGardenWorld {
     // 2. VOLUMETRIC GOD RAYS / SKY LIGHT SHAFTS
     const rayGeo = new THREE.CylinderGeometry(0.8, 11.0, 42, 16, 1, true);
     const rayMat = new THREE.MeshBasicMaterial({
-      color: 0xfef3c7,
+      color: GARDEN_EXTENDED.GOD_RAY_COLOR,
       transparent: true,
-      opacity: 0.02,
+      opacity: GARDEN_EXTENDED.GOD_RAY_OPACITY,
       side: THREE.DoubleSide,
       blending: THREE.NormalBlending,
       depthWrite: false
@@ -188,7 +210,7 @@ export class SolanderGardenWorld {
     });
 
     // 3. AIRBORNE LIGHT SPORES & FAIRY WISPS (Sky / Zelda Lost Woods Style)
-    const sporeCount = 200;
+    const sporeCount = GARDEN_EXTENDED.SPORE_COUNT;
     const sporeGeo = new THREE.BufferGeometry();
     const sporePos = new Float32Array(sporeCount * 3);
     for (let i = 0; i < sporeCount * 3; i += 3) {
@@ -199,8 +221,8 @@ export class SolanderGardenWorld {
     sporeGeo.setAttribute('position', new THREE.BufferAttribute(sporePos, 3));
 
     const sporeMat = new THREE.PointsMaterial({
-      color: 0xa7f3d0,
-      size: 0.28,
+      color: GARDEN_EXTENDED.SPORE_COLOR,
+      size: GARDEN_EXTENDED.SPORE_SIZE,
       transparent: true,
       opacity: 0.75,
       blending: THREE.AdditiveBlending
@@ -266,7 +288,12 @@ export class SolanderGardenWorld {
 
   private buildTerrain() {
     // Ground Mesh - Expanded 480x480 for massive exploration (4x area!)
-    const geo = new THREE.PlaneGeometry(480, 480, 160, 160);
+    const geo = new THREE.PlaneGeometry(
+      GARDEN_EXTENDED.TERRAIN_SIZE, 
+      GARDEN_EXTENDED.TERRAIN_SIZE, 
+      GARDEN_EXTENDED.TERRAIN_SEGMENTS, 
+      GARDEN_EXTENDED.TERRAIN_SEGMENTS
+    );
     geo.rotateX(-Math.PI / 2);
 
     const pos = geo.attributes.position;
@@ -328,44 +355,34 @@ export class SolanderGardenWorld {
     smallShore.position.set(this.smallPoolCenter.x, 0.02, this.smallPoolCenter.z);
     this.group.add(smallShore);
 
-    // Floating Lotus Lily Pads & Flowers on Both Pools
-    const padGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.04, 12);
-    const padMat = new THREE.MeshToonMaterial({ color: 0x15803d });
-    const flowerGeo = new THREE.DodecahedronGeometry(0.18, 1);
-    const flowerMat = new THREE.MeshToonMaterial({ color: 0xf472b6 });
+    // Floating Lotus Lily Pads & Flowers on Both Pools - Using instanced rendering
+    const padMat = new THREE.MeshToonMaterial({ color: GARDEN_EXTENDED.LILY_PAD_COLOR });
+    const flowerMat = new THREE.MeshToonMaterial({ color: GARDEN_EXTENDED.FLOWER_COLOR });
 
-    // Lily pads on main lake
-    for (let l = 0; l < 8; l++) {
-      const angle = (l / 8) * Math.PI * 2;
-      const r = 3.5 + Math.random() * 6.5;
-      const pad = new THREE.Mesh(padGeo, padMat);
-      pad.position.set(
-        this.poolCenter.x + Math.cos(angle) * r,
-        0.08,
-        this.poolCenter.z + Math.sin(angle) * r
-      );
-      if (l % 2 === 0) {
-        const flower = new THREE.Mesh(flowerGeo, flowerMat);
-        flower.position.set(0, 0.12, 0);
-        pad.add(flower);
-      }
-      this.group.add(pad);
+    // Main lake lily pads using instancing for better performance
+    const mainLilies = this.createInstancedLilyPads(
+      GARDEN_EXTENDED.LILY_PAD_COUNT_MAIN,
+      this.poolCenter,
+      this.poolRadius,
+      padMat,
+      flowerMat
+    );
+    this.group.add(mainLilies.pads);
+    if (mainLilies.flowers) {
+      this.group.add(mainLilies.flowers);
     }
 
-    // Lily pads on small lotus pool
-    for (let l = 0; l < 5; l++) {
-      const angle = (l / 5) * Math.PI * 2;
-      const r = 1.2 + Math.random() * 3.0;
-      const pad = new THREE.Mesh(padGeo, padMat);
-      pad.position.set(
-        this.smallPoolCenter.x + Math.cos(angle) * r,
-        0.08,
-        this.smallPoolCenter.z + Math.sin(angle) * r
-      );
-      const flower = new THREE.Mesh(flowerGeo, flowerMat);
-      flower.position.set(0, 0.12, 0);
-      pad.add(flower);
-      this.group.add(pad);
+    // Small lotus pool lily pads
+    const smallLilies = this.createInstancedLilyPads(
+      GARDEN_EXTENDED.LILY_PAD_COUNT_SMALL,
+      this.smallPoolCenter,
+      this.smallPoolRadius,
+      padMat,
+      flowerMat
+    );
+    this.group.add(smallLilies.pads);
+    if (smallLilies.flowers) {
+      this.group.add(smallLilies.flowers);
     }
 
     // 2. High Rock Cliff Waterfall Centerpiece
@@ -373,15 +390,23 @@ export class SolanderGardenWorld {
 
     // Large Rock Formation
     const rockGeo = new THREE.DodecahedronGeometry(3.5, 1);
-    const rockMat = new THREE.MeshToonMaterial({ color: 0x475569 });
+    const rockMat = new THREE.MeshToonMaterial({ color: GARDEN_EXTENDED.ROCK_COLOR });
 
     const rock1 = new THREE.Mesh(rockGeo, rockMat);
     rock1.position.set(-3, 2.5, -15);
-    rock1.scale.set(1.5, 1.8, 1.2);
+    rock1.scale.set(
+      GARDEN_EXTENDED.ROCK_SCALE_X,
+      GARDEN_EXTENDED.ROCK_SCALE_Y,
+      GARDEN_EXTENDED.ROCK_SCALE_Z
+    );
 
     const rock2 = new THREE.Mesh(rockGeo, rockMat);
     rock2.position.set(3, 2.5, -15);
-    rock2.scale.set(1.5, 1.8, 1.2);
+    rock2.scale.set(
+      GARDEN_EXTENDED.ROCK_SCALE_X,
+      GARDEN_EXTENDED.ROCK_SCALE_Y,
+      GARDEN_EXTENDED.ROCK_SCALE_Z
+    );
 
     const rockCenter = new THREE.Mesh(rockGeo, rockMat);
     rockCenter.position.set(0, 3.2, -15.5);
@@ -390,7 +415,11 @@ export class SolanderGardenWorld {
     cliffGroup.add(rock1, rock2, rockCenter);
 
     // Waterfall Animated Water Stream Sheet
-    const fallGeo = new THREE.PlaneGeometry(3.2, 5.2, 16, 16);
+    const fallGeo = new THREE.PlaneGeometry(
+      GARDEN_EXTENDED.WATERFALL_WIDTH,
+      GARDEN_EXTENDED.WATERFALL_HEIGHT,
+      16, 16
+    );
     const fallMat = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
       emissive: 0x38bdf8,
@@ -1100,15 +1129,149 @@ export class SolanderGardenWorld {
       }
     });
 
-    // Fireflies slow float
+    // Fireflies slow float - using constants
     if (this.fireflies) {
       const pos = this.fireflies.geometry.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i < pos.count; i++) {
         let y = pos.getY(i) + Math.sin(time + i) * 0.003;
-        if (y > 4) y = 0.5;
+        if (y > GARDEN_EXTENDED.FIREFLY_Y_MAX) y = GARDEN_EXTENDED.FIREFLY_Y_MIN;
         pos.setY(i, y);
       }
       pos.needsUpdate = true;
     }
+  }
+
+  /**
+   * Create instanced lily pads for efficient rendering
+   */
+  private createInstancedLilyPads(
+    count: number,
+    poolCenter: THREE.Vector3,
+    poolRadius: number,
+    padMaterial: THREE.Material,
+    flowerMaterial?: THREE.Material
+  ): { pads: THREE.InstancedMesh; flowers?: THREE.InstancedMesh } {
+    const dummy = new THREE.Object3D();
+    
+    // Create lily pad geometry
+    const padGeo = new THREE.CylinderGeometry(
+      GARDEN_EXTENDED.LILY_PAD_RADIUS,
+      GARDEN_EXTENDED.LILY_PAD_RADIUS,
+      0.04, 12
+    );
+    
+    // Create instanced mesh for pads
+    const pads = new THREE.InstancedMesh(padGeo, padMaterial, count);
+    pads.castShadow = false;
+    pads.receiveShadow = true;
+    
+    const positions: THREE.Vector3[] = [];
+    
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const r = 1.2 + Math.random() * (poolRadius - 2);
+      const x = poolCenter.x + Math.cos(angle) * r;
+      const z = poolCenter.z + Math.sin(angle) * r;
+      
+      positions.push(new THREE.Vector3(x, 0.08, z));
+    }
+    
+    // Update all instances
+    positions.forEach((pos, i) => {
+      dummy.position.copy(pos);
+      dummy.rotation.set(Math.PI / 2, 0, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      pads.setMatrixAt(i, dummy.matrix);
+    });
+    
+    pads.instanceMatrix.needsUpdate = true;
+    
+    let flowers: THREE.InstancedMesh | undefined;
+    
+    if (flowerMaterial) {
+      const flowerGeo = new THREE.DodecahedronGeometry(GARDEN_EXTENDED.FLOWER_SIZE, 1);
+      const flowerCount = Math.floor(count / 2); // Every other pad has a flower
+      
+      flowers = new THREE.InstancedMesh(flowerGeo, flowerMaterial, flowerCount);
+      
+      for (let i = 0; i < flowerCount; i++) {
+        const pos = positions[i * 2]; // Every other position
+        dummy.position.copy(pos);
+        dummy.position.y += 0.12;
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        flowers.setMatrixAt(i, dummy.matrix);
+      }
+      
+      flowers.instanceMatrix.needsUpdate = true;
+    }
+    
+    return { pads, flowers };
+  }
+  
+  /**
+   * Dispose resources to prevent memory leaks
+   */
+  public dispose(): void {
+    // Dispose fireflies
+    if (this.fireflies) {
+      this.fireflies.geometry.dispose();
+      (this.fireflies.material as THREE.Material).dispose();
+    }
+    
+    // Dispose airborne spores
+    if (this.airborneSpores) {
+      this.airborneSpores.geometry.dispose();
+      (this.airborneSpores.material as THREE.Material).dispose();
+    }
+    
+    // Dispose waterfall mist particles
+    if (this.waterfallMistParticles) {
+      this.waterfallMistParticles.geometry.dispose();
+      (this.waterfallMistParticles.material as THREE.Material).dispose();
+    }
+    
+    // Dispose mist puffs
+    this.mistPuffs.forEach(puff => {
+      puff.geometry.dispose();
+      (puff.material as THREE.Material).dispose();
+    });
+    
+    // Dispose god rays
+    this.godRays.forEach(ray => {
+      ray.geometry.dispose();
+      (ray.material as THREE.Material).dispose();
+    });
+    
+    // Dispose water meshes
+    if (this.waterMesh) {
+      this.waterMesh.geometry.dispose();
+      (this.waterMesh.material as THREE.Material).dispose();
+    }
+    
+    if (this.smallWaterMesh) {
+      this.smallWaterMesh.geometry.dispose();
+      (this.smallWaterMesh.material as THREE.Material).dispose();
+    }
+    
+    // Dispose eggs
+    this.eggs.forEach(egg => {
+      egg.mesh.traverse(child => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh;
+          mesh.geometry.dispose();
+          (mesh.material as THREE.Material).dispose();
+        }
+      });
+    });
+    
+    // Clear arrays
+    this.clouds = [];
+    this.mistPuffs = [];
+    this.godRays = [];
+    this.eggs = [];
+    this.palmFruits = [];
   }
 }
