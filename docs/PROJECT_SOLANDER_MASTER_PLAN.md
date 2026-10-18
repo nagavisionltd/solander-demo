@@ -1,244 +1,218 @@
 # Project Solander — Master Plan
-**Working edition:** 0.2 · **Last consolidated:** 18 October 2026  
-**Project owner / Creative Director:** Curtis Soul · NagaVision Ltd  
-**Status:** Strategic working document — implementation status must be verified against the playable build.
+**Working edition:** 0.3 · **Last consolidated:** 18 October 2026  
+**Owner / Creative Director:** Curtis Soul · NagaVision Ltd  
+**Planning status:** Source audit completed; runtime/build audit still outstanding.
 
-> **North star:** Every system should strengthen the player's bond with their companion, or make the world more meaningful to explore.
+> **North star:** Every system should strengthen the player's bond with Lumi or make the world more meaningful to explore.
 
-## 1. Executive vision
+## 1. Executive direction
 
-Project Solander is an original 3D creature-raising adventure IP built around a living ecosystem. Players explore a world, discover and rescue creatures, bring them home, form relationships, train and evolve them, then use what they learn and become to access new places and experiences.
+Project Solander is an original 3D creature-raising adventure IP built around a living ecosystem. The near-term job is to prove a small, emotionally convincing game loop in the browser, then package that evidence into a credible opportunity for partners, publishers or investors.
 
-The ambition is bigger than a garden simulator and more emotionally grounded than a creature collection checklist. The garden is the player's home; the companion is the emotional anchor; the wider world is a playground for curiosity, adaptation and discovery.
+**Sequence:** Prove the game → test with players → capture evidence → package the opportunity.  
+Do not reverse this sequence by polishing a pitch around unverified features.
 
-Long-term opportunities may include PC and console releases, companion-linked mobile features, social play, arcade experiences, competitions, and physical collectibles. These are strategic possibilities, not launch commitments.
+The garden is home. Lumi is the emotional anchor. Exploration creates discoveries. Raising and bonding should change what the player can do next.
 
-## 2. Product identity
+Long-term opportunities may include PC/console, mobile companion features, social play, arcade experiences, competitions and physical collectibles. These are options, not launch commitments.
 
-### What makes Solander distinct
-- **Bond before stats:** care, personality, memory and shared experiences matter.
-- **An ecosystem, not a menu of modes:** exploration feeds raising; raising changes traversal; traversal reveals secrets; competition celebrates growth.
-- **Adaptation as progression:** creature traits and DNA-inspired abilities change how players understand and move through the same world.
-- **A home worth returning to:** the garden visibly changes as the player and companions grow.
-- **Stories emerge from play:** companions develop preferences, relationships and memorable moments through understandable systems.
+## 2. Decisions now set
 
-### Design test
-For each proposed feature, ask:
-1. Does it strengthen attachment to a companion?
-2. Does it create an interesting choice, discovery or player-authored story?
-3. Does it connect to another system rather than exist in isolation?
-4. Can the player understand the feedback without reading a wall of text?
-5. Is it feasible for the current team and target platform?
+- **Immediate objective:** both, in sequence — playable proof first, opportunity package second.
+- **First companion:** Lumi.
+- **First platform:** browser-playable, for fast iteration.
+- **Technical direction:** preserve the current Next.js + React + TypeScript + Three.js stack unless the build audit identifies a concrete blocker.
+- **Scope principle:** prove one complete loop before adding breadth.
 
-If the answer is mostly no, defer it.
+The code currently uses the names **Solander**, **Lumi**, **Nova**, **Terra**, and several **Chao** labels. The HUD labels the player as **Neelo** during combat. Confirm the canonical naming and original identity before pitch materials are produced.
 
-## 3. Core player loop
+## 3. What makes Solander distinct
 
-**Discover → Rescue / collect → Return home → Care and bond → Train / adapt → Explore further → Find new resources and stories → Repeat.**
+1. **Bond before stats:** care should create visible, understandable reactions.
+2. **Adaptation as progression:** what a companion becomes should change how the player explores.
+3. **A home worth returning to:** adventures should leave a lasting consequence in the garden.
+4. **A living ecosystem:** companions should feel like individuals, not interchangeable collectibles.
+5. **Discovery over checklisting:** teach through behaviour, landmarks, sound, light and environmental clues.
 
-A fuller franchise loop can later add evolution, races, trials, tactical encounters, festivals and community events. These should be layered on only after the smaller loop is satisfying.
+Every proposed feature must answer: does it deepen attachment, create meaningful discovery, connect systems, provide clear feedback, and fit the current proof budget?
 
-## 4. Pillars and modes
+## 4. Current repository audit
 
-### Garden / Home
-The emotional hub. Feed, pet, carry, observe and play with companions; collect resources; hatch eggs; customise a small space; see the effects of care and time. The garden should feel alive even when the player is not pursuing a mission.
+This status is based on source inspection of the default-branch files and commit history. It is **not** a claim that a production build or live playtest has passed. Until a browser run and build are completed, implementation statuses below mean “visible in source”, not “verified working end-to-end”.
 
-### Adventure
-Authored routes, environmental puzzles, secrets and selective combat. Levels are built around verbs and discoveries, not long empty corridors. A central hub connects distinct regions, and returning with new abilities should reveal new routes.
+| System / feature | Source audit status | Notes / next verification |
+|---|---|---|
+| Browser app shell | **Implemented in source; runtime unverified** | Next.js client page mounts a Three.js scene and React HUD. Run install, lint and production build. |
+| 3D scene and camera | **Implemented in source; runtime unverified** | Three.js renderer, third-person camera, lighting, fog and bloom are wired in scene manager. |
+| Garden world | **Implemented in source; runtime unverified** | Garden world and environment systems are instantiated. Check spawn, collisions, readability and frame rate. |
+| Lumi as default companion | **Implemented in source; runtime unverified** | Save model creates Lumi with a persistent ID, baseline stats, personality, bond and initial memory. Verify on a clean browser profile. |
+| Other garden creatures | **Implemented in source; runtime unverified** | Nova and Terra are seeded as additional creatures; AI controllers are created for the initial roster. |
+| Companion interaction | **Implemented in source; runtime unverified** | Source includes feeding, petting/carrying pathways, emotion feedback and bond/stat changes across relevant systems. Test each action and its feedback. |
+| Local save/load | **Implemented in source; needs robustness test** | Uses browser localStorage key `solander_save` for game state and creature records. No versioned migration is evident in inspected code; test corrupted/old saves and reload continuity. |
+| Resources and inventory data | **Implemented in source; loop needs validation** | Essence, seeds, crystals and several fruit resources are tracked. Confirm collection, spending and reward balance in play. |
+| Eggs / hatching | **Implemented in source; runtime unverified** | Save system contains hatch logic and new-creature creation. Verify discovery, hatch trigger and scene/AI registration together. |
+| Mystic Valley | **Implemented in source; runtime unverified** | Separate world, stage selection, portal transitions and resource/enemy systems are wired. Verify entry/exit, spawn points and return-to-garden continuity. |
+| Hub World | **Implemented in source; runtime unverified** | Hub world and portal are instantiated. Decide whether it belongs in the first proof or is deferred. |
+| Movement and input | **Implemented in source; feel unverified** | Keyboard, mouse, gamepad and touch joystick pathways exist; movement includes speed stages, jump, roll/dash and combat inputs. Prioritise movement feel and accessibility over more moves. |
+| Combat | **Implemented in source; defer from core proof** | Melee and laser paths plus Mystic Valley enemy handling exist. Keep only if they support Solander’s identity; avoid letting action mechanics overwhelm bonding and discovery. |
+| Races / karate | **Partially implemented / likely placeholder** | UI progress advances on timers and records wins; this is not yet evidence of a meaningful skill-based competition system. Do not present as a finished game mode. |
+| Evolution / stats | **Partially implemented** | Stat progression and threshold-based form changes exist in save logic. Verify that visible transformation, player choice and traversal consequences are real and coherent. |
+| Creature memories | **Partially implemented** | Memory entries are recorded in save data for selected events. This is an event log, not yet proof of a rich memory/personality system. |
+| Breeding / genetics | **Basic code path exists; not validated as a feature** | Offspring data is generated from parent values. No claim of deep genetics, inherited visual traits or balanced breeding until tested. |
+| Rabbit / Wolf / Dragon / Phoenix traversal DNA | **Planned / not verified** | These remain the design framework for ability-led exploration. No inspected evidence confirms these archetypes or ability-gated routes are implemented. |
+| Adventure outcome changes home | **Not yet verified** | This is essential to the target loop. Define and build one persistent consequence rather than adding another world. |
+| Automated tests / build status | **Unknown** | Package scripts include dev, build and lint; no test script is defined in package.json. Run the commands and record results. |
+| README and product metadata | **Needs update** | README's documented directory structure/features do not fully match the current file paths, and app metadata still says “My Google AI Studio App”. Update after build verification. |
 
-### Explore
-A lower-pressure activity loop: gathering, fishing, mining, archaeology, tracking and rare discoveries, introduced only when they can support the core game.
+### Source references inspected
+- [Game page and HUD](../app/page.tsx)
+- [Scene manager and world transitions](../src/engine/scene.ts)
+- [Save system, Lumi defaults, interactions and localStorage](../src/systems/save.ts)
+- [Input manager](../src/engine/input.ts)
+- [Central constants](../src/constants/index.ts)
+- [Package scripts and dependencies](../package.json)
+- [Current README](../README.md)
 
-### Trials / Festival
-Short, repeatable races, obstacle courses and skill challenges that let companions demonstrate their development. Tactical battles and larger tournaments are later-stage candidates, not prerequisites for the first compelling build.
+## 5. The first proof: Lumi's garden loop
 
-## 5. Companion system
+The first playable slice should make one small experience memorable:
 
-### First playable companion
-Use one companion to prove the full emotional loop before scaling species count. Lumi is the working companion name in earlier planning; confirm whether this remains the chosen name in the current build.
+1. **Arrive:** player understands movement and sees Lumi clearly.
+2. **Connect:** approach Lumi, interact, feed or pet; Lumi responds visibly and bond changes.
+3. **Discover:** find one resource, egg or environmental secret that feels worth noticing.
+4. **Use the discovery:** spend or return with it to unlock one meaningful change.
+5. **Adapt:** one simple companion-related ability or trait reveals a route previously inaccessible.
+6. **Return:** come back to the garden and see the consequence persist.
+7. **Remember:** reload the browser and confirm essential state remains.
 
-### Minimum companion behaviour
-- Clear emotional states with visible reactions.
-- Follow, wander, approach and idle behaviours.
-- Feeding, petting and carrying interactions with responsive animation.
-- A small set of needs/preferences and a readable bond/progression signal.
-- Persistent identity and basic save/load.
-- Reliable feedback when the player does something meaningful.
+This loop is the first success criterion. Combat, a hub, multiple stage variants, breeding, races, karate, a large roster and cross-platform systems are not prerequisites.
 
-### Growth and identity — later layers
-- Personality traits, favourite foods, toys and locations.
-- Memory of selected meaningful events, not a transcript of every action.
-- Friendship, rivalry and social behaviour.
-- Trait inheritance / breeding and rare lineages.
-- Visual evolution and environmental influence.
-
-Do not build a complex genetics simulator until players care about the base companion.
-
-## 6. Adaptation and creature DNA
-
-The early archetypes are **Rabbit, Wolf, Dragon and Phoenix**. Treat these as a design framework, not a promise that all four are fully implemented.
-
-- **Rabbit:** agility, longer jumps and nimble traversal.
-- **Wolf:** scent, tracking and hidden-route discovery.
-- **Dragon:** gliding / aerial traversal and possible elemental interactions.
-- **Phoenix:** heat-related interactions, aerial movement or regeneration.
-
-The defining rule: a traversal obstacle should ideally be solved through what the player or companion has become, not simply by finding a key. Abilities should combine and unlock new readings of previously visited spaces.
-
-## 7. World structure
-
-Start with a small, coherent geography:
-1. **Solander Garden:** safe home, first companion interactions and onboarding.
-2. **First adventure region:** one visually distinct area with a clear landmark, a resource loop, a secret route and one adaptation-gated discovery.
-3. **Return path:** a reason to go back to the garden and see a consequence of the adventure.
-4. **Cave / portal transition:** retain only if it supports clear navigation and a meaningful destination.
-5. **Second region:** expand only after the first region's movement, interaction and return loop works reliably.
-
-Potential future biomes include Meadow, Forest, Beach, Volcano, Crystal Cave, Cloud, Dream, Ancient and Haunted Gardens. These are expansion vocabulary, not first-slice scope.
-
-## 8. First vertical slice: definition of done
-
-The first slice should prove one complete player experience, not the number of features in the repository.
-
-- The player can enter and navigate the garden with reliable controls.
-- At least one companion behaves believably and responds to care.
-- One meaningful resource / egg / discovery can be found and used.
-- A clear transition leads to a compact adventure area.
-- One creature trait or ability enables a new route or discovery.
+### Vertical-slice definition of done
+- A first-time player can move and interact without coaching.
+- Lumi feels responsive through animation, timing and readable feedback.
+- One discovery creates a visible, understandable change.
+- One ability or companion trait opens a new route or option.
 - The player can return home and observe a persistent consequence.
-- Save/load preserves essential player and companion state.
-- A first-time player can understand the loop with minimal text.
-- The build runs consistently in the target browser and has no blocker-level console errors.
-- Performance and asset loading are acceptable on an agreed reference device.
+- Save/load preserves the important state after refresh.
+- No blocker-level console errors; build and lint results are recorded.
+- Performance is acceptable on an agreed reference laptop/browser.
+- At least five external testers complete a short moderated playtest; confusion and delight points are recorded.
 
-**Do not expand scope** until these criteria are tested in a playable build.
+## 6. Roadmap gates
 
-## 9. Production roadmap and gates
+### Gate 0 — Verify and stabilise (**next**)
+- Install dependencies from the lockfile; run lint and production build.
+- Launch the browser app and test the actual current branch.
+- Record a short screen capture of the baseline.
+- Create a bug list and classify issues by blocker / high / medium / low.
+- Test a clean save, interaction, world transition and refresh persistence.
+- Fix the README and metadata after confirming the actual app entry points.
 
-### Gate 0 — Audit and stabilise
-- Confirm the current default branch and working demo.
-- Run install, development server and production build.
-- Map implemented, partial, broken and planned systems.
-- Record controls, known bugs, asset licences and performance baseline.
-- Keep the current demo reproducible.
+**Exit:** reproducible build, verified baseline, truthful feature matrix and prioritised blockers.
 
-**Exit:** a verified build and a truthful implementation inventory.
+### Gate 1 — Feel and bond
+- Tune player speed, acceleration, camera, collisions and interaction distance.
+- Make Lumi's idle/follow/approach/care responses expressive and reliable.
+- Reduce HUD clutter and make controls easy to discover.
+- Ensure every care interaction has immediate visual/audio/state feedback.
 
-### Gate 1 — Feel
-- Polish player movement, camera, collisions and interaction prompts.
-- Make the companion feel responsive through animation, timing and feedback.
-- Remove major friction from the garden loop.
+**Exit:** testers naturally try to interact with Lumi and understand the response.
 
-**Exit:** a new tester can move, interact and form an initial attachment without coaching.
+### Gate 2 — Discover and return
+- Choose one compact discovery and one small adventure area.
+- Connect a resource or secret to a meaningful ability/route.
+- Make the return to the garden change something persistent.
+- Remove dead ends and unclear portal/stage navigation.
 
-### Gate 2 — Remember
-- Implement the smallest dependable save/load system.
-- Persist companion identity, state and a few meaningful milestones.
-- Establish a data model that can be extended without premature backend complexity.
+**Exit:** a complete garden → discovery → return loop works on repeat play.
 
-**Exit:** returning to the game feels continuous rather than reset.
+### Gate 3 — Remember and adapt
+- Harden local save/load and add a save schema version.
+- Define one simple adaptation or evolution outcome that changes traversal or interaction.
+- Confirm the visual change matches the underlying state.
+- Add migration and graceful fallback for invalid save data.
 
-### Gate 3 — Discover
-- Build one compact adventure region.
-- Add a resource / secret loop and one adaptation-gated route.
-- Connect adventure outcomes back to the garden.
+**Exit:** the player's progress survives reload and changes what they can do.
 
-**Exit:** players have a reason to explore, return and try something new.
+### Gate 4 — External proof
+- Run moderated playtests with at least five people; include people unfamiliar with the project.
+- Track time to first interaction, loop completion, points of confusion and desire to return.
+- Fix the biggest friction points, not every requested feature.
+- Capture a clean 60–120 second gameplay sequence only after the loop is reliable.
 
-### Gate 4 — Demonstrate growth
-- Prototype one clear progression or evolution consequence.
-- Add one short trial or race only if the core loop is already strong.
-- Test comprehension, enjoyment and replay intent with external players.
+**Exit:** evidence that players understand and value the core fantasy.
 
-**Exit:** playtest feedback supports the core fantasy, not just the visuals.
+### Gate 5 — Package the opportunity
+- Produce a concise one-page overview, short pitch deck and gameplay video.
+- Explain the unique proposition, audience hypothesis, current proof, roadmap, team needs, budget assumptions and key risks.
+- Separate existing proof from future franchise opportunities.
+- Prepare a realistic next-phase scope and cost range; do not invent traction or player metrics.
 
-### Gate 5 — Vertical-slice presentation
-- Fix priority bugs, optimise assets and controls, capture clean footage.
-- Prepare a concise pitch, gameplay trailer and production estimate.
-- Decide whether the next investment is prototype expansion, a funding/publishing approach or a narrower product.
+**Exit:** a credible, evidence-led conversation starter for partners, publishers or investors.
 
-**Exit:** a repeatable demo that communicates the game's unique appeal in minutes.
+## 7. Technical direction
 
-## 10. Technical direction
+Keep the current browser-first stack unless verification shows it is a blocker: Next.js, React, TypeScript and Three.js. Prefer small changes over a rewrite.
 
-The repository currently documents a browser-first Three.js / Next.js / TypeScript architecture. Preserve the existing stack unless an audit demonstrates a concrete reason to change it.
+- Separate gameplay state from rendering/UI.
+- Keep tunables centralised and reduce duplicate or conflicting constants.
+- Add cleanup for renderer, animation loops, timers, resize handlers and event listeners.
+- Version save data and handle unavailable/corrupt localStorage safely.
+- Use keyboard/mouse as the primary desktop path; keep touch as a useful iteration path.
+- Add lightweight diagnostics for frame rate, asset failures and state transitions.
+- Do not add accounts, multiplayer, backend services or cross-device passport infrastructure until playtests demonstrate a need.
 
-Architecture principles:
-- Keep gameplay systems modular and state ownership explicit.
-- Separate game state from presentation and animation.
-- Centralise tunable values; avoid scattered magic numbers.
-- Use shared assets, instancing and level-of-detail where appropriate.
-- Dispose of GPU resources and listeners correctly.
-- Load assets predictably and expose useful failure states.
-- Keep save data versioned and migrate it deliberately.
-- Design for keyboard first in the prototype; add controller/touch only when a target and UX are defined.
-- Avoid backend, multiplayer and cross-platform-account infrastructure until the vertical slice proves a need.
+## 8. Product, art and UX principles
 
-Suggested system boundaries: player controller, camera, interaction, companion AI/state, world/level, progression/save, asset loading, audio, UI and diagnostics. Match these boundaries to the actual repository after audit rather than forcing a rewrite to fit this document.
+- Bright, magical, colourful world with strong silhouettes and memorable landmarks.
+- Lumi must read clearly against the environment; prioritise expressive animation and proximity behaviour.
+- Keep the HUD minimal and contextual. The current HUD exposes many resources, combat states and menu systems; simplify for the first proof.
+- Teach through environment and companion behaviour before text-heavy tutorials.
+- Use sound, animation and restrained visual effects to make interactions feel rewarding.
+- Keep the design language original. Inspirations are reference points, not assets, branding or mechanics to copy wholesale.
 
-## 11. UX and art direction
+## 9. Commercial path
 
-- Strong, readable silhouettes for player and creatures.
-- Warm, magical, colourful environments with clear landmarks and navigable paths.
-- Important interactables must read at a glance.
-- Teach through creature behaviour, footprints, framing, light and environmental clues before adding tutorial paragraphs.
-- Feedback should be immediate: animation, sound, particles or a simple UI response.
-- Keep HUD minimal; show the information needed for the current action.
-- Use accessibility options for camera sensitivity, audio levels, input remapping and motion comfort as the project matures.
-- Originalise the visual language. Inspirations are reference points, not assets or designs to copy.
+**Near term:** prove a small browser game, collect playtest evidence and make a short gameplay capture.
 
-## 12. Commercial and franchise strategy
+**Next:** use the evidence to decide whether to expand the browser slice, package a PC-first prototype, seek a publishing/funding conversation or narrow the concept.
 
-Build proof before promises.
+**Long term possibilities:** larger biomes, more creature lineages, races/trials, mobile companion features, a cross-experience Companion Passport, social play, arcade installations and physical collectibles. None should be presented as delivered functionality until implemented and tested.
 
-**Near term:** playable browser demo, original visual identity, clear gameplay capture, playtest evidence and a concise pitch package.
+Do not make monetisation depend on pay-to-win advantages or exploitative rarity systems. If the project later targets children or introduces accounts/community features, privacy, safety and compliance need dedicated design.
 
-**Mid term:** expand the vertical slice based on player evidence; evaluate PC distribution and community-building; establish a realistic production budget and team plan.
+## 10. Measures that matter
 
-**Long term opportunities:** console/mobile adaptations, companion passport across experiences, social play, arcade integrations, seasonal events, physical merchandise and QR/NFC-linked extras.
+Record:
+- Time to first meaningful interaction with Lumi.
+- Percentage of testers who understand how to interact and care.
+- Percentage who find the first discovery without help.
+- Percentage who complete the full garden → discovery → return loop.
+- Save/load success after refresh and browser restart.
+- Performance and loading behaviour on reference hardware.
+- The words testers use to describe Lumi and what they want to do next.
+- Whether testers choose to continue playing after the guided task.
 
-Do not build monetisation around breeding, rarity or competitive advantage before the game has demonstrated trust and fun. Avoid pay-to-win assumptions. Any account, privacy, child-safety or cross-device feature requires a deliberate product and compliance plan.
+Feature count, screenshots and developer enthusiasm are not substitutes for player evidence.
 
-## 13. Evidence and success measures
+## 11. Risks and guardrails
 
-Track a small set of observable measures:
-- Time to first meaningful companion interaction.
-- Percentage of testers who understand how to care for the companion.
-- Percentage who discover the first secret or resource without help.
-- Successful completion of the garden → adventure → return loop.
-- Save/load reliability.
-- Session stability and frame-time / loading performance on reference hardware.
-- Tester descriptions of what made their companion feel distinctive.
-- Desire to return and what they want to do next.
+- **Scope creep:** the current source contains many systems; do not mistake breadth for a proven core game.
+- **Identity drift:** code and UI currently contain Chao terminology and Sonic-inspired movement. Confirm Solander's original identity and avoid an overly derivative pitch or presentation.
+- **False completion claims:** code presence is not runtime verification. Keep statuses explicit until tested.
+- **Fragile persistence:** localStorage has no obvious versioning in the inspected implementation; harden before relying on saved progress.
+- **Placeholder modes:** timer-driven race progress should not be marketed as a complete competition system.
+- **Pitch before proof:** package the opportunity after player evidence, not instead of it.
 
-Use short moderated playtests and record confusion, delight and abandonment points. Do not mistake feature count or developer enthusiasm for evidence of player attachment.
+## 12. Immediate action list
 
-## 14. Risks and guardrails
-
-- **Scope creep:** the world vision is large; the first slice must stay small.
-- **Feature-first development:** more systems cannot compensate for an unconvincing companion.
-- **Premature infrastructure:** multiplayer, complex genetics, accounts and cross-platform services add cost before value is proven.
-- **Prototype fragility:** document how to run, build and test the project; maintain reproducible checkpoints.
-- **IP confusion:** keep Solander's identity and mechanics distinct from its inspirations and from other Naga games.
-- **Unverified implementation claims:** mark features as implemented only after testing them in the current branch.
-
-## 15. Decisions to confirm
-
-1. Is **Lumi** still the first companion's name?
-2. Is **Neelo** the player character for Solander, or does that name belong to a separate game / shared character universe?
-3. Is the first target a browser-playable proof of concept, or a PC-first vertical slice that happens to use web technology?
-4. Which current build URL is the trusted live demo, if one exists?
-5. Is the immediate goal a playable prototype, a publisher/investor pitch, or both in sequence?
-6. Which existing mechanics are genuinely working today, versus planned or partially implemented?
-
-## 16. Immediate next actions
-
-1. Audit the current main branch and run the build.
-2. Create a feature-status matrix: **working / partial / broken / planned**.
-3. Test the complete garden → companion interaction → discovery → adventure → return loop.
-4. Fix the highest-impact blockers before adding new features.
-5. Update this document with verified status and assign each roadmap item a priority and acceptance test.
-6. Create a short capture-ready build and use external playtest evidence to decide the next milestone.
+1. **Run the current project:** install from the lockfile; execute lint and production build; capture exact results.
+2. **Play the baseline:** test controls, Lumi interactions, resource collection, portal transition, return and reload.
+3. **Create a blocker list:** prioritise build/runtime issues, movement feel, companion feedback, and save continuity.
+4. **Choose the smallest discovery loop:** one resource or egg, one meaningful use, one persistent return consequence.
+5. **Trim the first-run HUD:** surface the controls and interactions that support the loop; defer secondary modes from the initial onboarding.
+6. **Refresh project documentation:** align README, app metadata and this master plan with the verified branch.
+7. **Playtest before pitch:** gather evidence, then build the opportunity package.
 
 ---
 
