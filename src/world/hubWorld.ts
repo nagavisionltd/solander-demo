@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import { PortalCave } from './portals';
 
 export class HubWorld {
@@ -18,6 +19,7 @@ export class HubWorld {
   private entranceModels: THREE.Object3D[] = [];
   private readonly gardenModels: Partial<Record<'NEUTRAL' | 'HERO' | 'DARK', THREE.Object3D>> = {};
   public activeAssetGarden: 'NEUTRAL' | 'HERO' | 'DARK' | null = null;
+  public gardenExitModel: THREE.Object3D | null = null;
 
   constructor() {
     this.sceneGroup = new THREE.Group();
@@ -323,11 +325,21 @@ export class HubWorld {
     this.entranceModels.forEach((entrance) => { entrance.visible = false; });
     Object.values(this.gardenModels).forEach((model) => { if (model) model.visible = false; });
     garden.visible = true;
+    const entranceIndex = id === 'NEUTRAL' ? 0 : (id === 'HERO' ? 1 : 2);
+    const sourceEntrance = this.entranceModels[entranceIndex];
+    if (sourceEntrance) {
+      this.gardenExitModel = sourceEntrance.clone(true);
+      this.gardenExitModel.position.set(0, 0, -17);
+      this.gardenExitModel.visible = true;
+      this.gardenExitModel.name = 'garden-return-entrance';
+      this.sceneGroup.add(this.gardenExitModel);
+    }
     return true;
   }
 
   public exitAssetGarden(): void {
     this.activeAssetGarden = null;
+    if (this.gardenExitModel) { this.sceneGroup.remove(this.gardenExitModel); this.gardenExitModel = null; }
     Object.values(this.gardenModels).forEach((model) => { if (model) model.visible = false; });
     if (this.lobbyModel) this.lobbyModel.visible = true;
     this.entranceModels.forEach((entrance) => { entrance.visible = true; });
