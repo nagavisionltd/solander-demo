@@ -83,6 +83,7 @@ export class SolanderGardenWorld {
       posArray[i + 2] = (Math.random() - 0.5) * GARDEN_EXTENDED.FIREFLY_SPREAD;
     }
     
+    particleGeo.userData.basePositions = posArray.slice();
     particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     
     const particleMat = new THREE.PointsMaterial({
@@ -111,6 +112,7 @@ export class SolanderGardenWorld {
       mistScales[i] = 0.6 + Math.random() * 0.9;
     }
 
+    mistGeo.userData.basePositions = mistPos.slice();
     mistGeo.setAttribute('position', new THREE.BufferAttribute(mistPos, 3));
 
     // Soft particle canvas texture for volumetric glow
@@ -163,7 +165,8 @@ export class SolanderGardenWorld {
     });
 
     for (let i = 0; i < GARDEN_EXTENDED.MIST_PUFF_COUNT; i++) {
-      const puff = new THREE.Mesh(puffGeo, puffMat);
+      // Each puff animates its own opacity, so it needs its own material instance.
+      const puff = new THREE.Mesh(puffGeo, puffMat.clone());
       puff.position.set(
         (Math.random() - 0.5) * 5.2,
         0.1 + Math.random() * 2.8,
@@ -171,7 +174,10 @@ export class SolanderGardenWorld {
       );
       puff.scale.setScalar(0.6 + Math.random() * 0.8);
       puff.userData = {
+        baseX: puff.position.x,
         baseY: puff.position.y,
+        baseZ: puff.position.z,
+        baseScale: puff.scale.x,
         speed: 0.4 + Math.random() * 0.8,
         swayPhase: Math.random() * Math.PI * 2
       };
@@ -218,6 +224,7 @@ export class SolanderGardenWorld {
       sporePos[i + 1] = 0.2 + Math.random() * 12.0;
       sporePos[i + 2] = (Math.random() - 0.5) * 100;
     }
+    sporeGeo.userData.basePositions = sporePos.slice();
     sporeGeo.setAttribute('position', new THREE.BufferAttribute(sporePos, 3));
 
     const sporeMat = new THREE.PointsMaterial({
@@ -943,6 +950,7 @@ export class SolanderGardenWorld {
 
       const h = this.getGroundHeight(e.x, e.z);
       eggGroup.position.set(e.x, h + 0.35, e.z);
+      eggGroup.userData.baseY = eggGroup.position.y;
 
       this.group.add(eggGroup);
       this.eggs.push({
@@ -1057,20 +1065,14 @@ export class SolanderGardenWorld {
     // Animate Volumetric Waterfall Mist Particle Cloud & Light Glow Interaction
     if (this.waterfallMistParticles) {
       const pos = this.waterfallMistParticles.geometry.attributes.position as THREE.BufferAttribute;
+      const base = this.waterfallMistParticles.geometry.userData.basePositions as Float32Array;
       for (let i = 0; i < pos.count; i++) {
-        let y = pos.getY(i) + (0.008 + (i % 5) * 0.002);
-        let x = pos.getX(i) + Math.sin(time * 2.2 + i * 0.8) * 0.006;
-        let z = pos.getZ(i) + Math.cos(time * 1.8 + i * 0.5) * 0.005;
-
-        if (y > 4.2) {
-          y = 0.1;
-          x = (Math.random() - 0.5) * 5.8;
-          z = -13.0 + (Math.random() - 0.5) * 3.2;
-        }
-
-        pos.setY(i, y);
-        pos.setX(i, x);
-        pos.setZ(i, z);
+        const offset = i * 3;
+        const baseY = base[offset + 1];
+        const rise = (baseY - 0.1 + time * (0.45 + (i % 5) * 0.06)) % 4.1;
+        pos.setY(i, 0.1 + rise);
+        pos.setX(i, base[offset] + Math.sin(time * 2.2 + i * 0.8) * 0.18);
+        pos.setZ(i, base[offset + 2] + Math.cos(time * 1.8 + i * 0.5) * 0.12);
       }
       pos.needsUpdate = true;
     }
@@ -1083,22 +1085,18 @@ export class SolanderGardenWorld {
     }
 
     // Animate Waterfall Mist Puffs
-    this.mistPuffs.forEach((puff, idx) => {
+    this.mistPuffs.forEach((puff) => {
       const data = puff.userData;
-      puff.position.y += data.speed * 0.008;
-      puff.position.x += Math.sin(time * 1.5 + data.swayPhase) * 0.006;
-      puff.position.z += Math.cos(time * 1.2 + data.swayPhase) * 0.006;
+      const rise = (time * data.speed) % 2.8;
+      const heightProgress = rise / 2.8;
+      puff.position.set(
+        data.baseX + Math.sin(time * 1.5 + data.swayPhase) * 0.3,
+        data.baseY + rise,
+        data.baseZ + Math.cos(time * 1.2 + data.swayPhase) * 0.2
+      );
       const mat = puff.material as THREE.MeshStandardMaterial;
-
-      // Expand puff as it rises, then reset when high
-      if (puff.position.y > data.baseY + 2.8) {
-        puff.position.y = data.baseY;
-        mat.opacity = 0.38;
-      } else {
-        const heightProgress = (puff.position.y - data.baseY) / 2.8;
-        mat.opacity = THREE.MathUtils.lerp(0.38, 0, heightProgress);
-        puff.scale.setScalar(0.6 + heightProgress * 1.2);
-      }
+      mat.opacity = THREE.MathUtils.lerp(0.38, 0, heightProgress);
+      puff.scale.setScalar(data.baseScale * (1 + heightProgress * 0.7));
     });
 
     // Animate Volumetric God Rays
@@ -1111,12 +1109,12 @@ export class SolanderGardenWorld {
     // Animate Airborne Light Spores (Sky: Children of the Light Style)
     if (this.airborneSpores) {
       const pos = this.airborneSpores.geometry.attributes.position as THREE.BufferAttribute;
+      const base = this.airborneSpores.geometry.userData.basePositions as Float32Array;
       for (let i = 0; i < pos.count; i++) {
-        let y = pos.getY(i) + Math.sin(time * 0.8 + i) * 0.004 + 0.003;
-        let x = pos.getX(i) + Math.cos(time * 0.5 + i) * 0.003;
-        if (y > 9.0) y = 0.2;
-        pos.setY(i, y);
-        pos.setX(i, x);
+        const offset = i * 3;
+        pos.setX(i, base[offset] + Math.cos(time * 0.5 + i) * 0.25);
+        pos.setY(i, 0.2 + ((base[offset + 1] - 0.2 + time * (0.12 + (i % 7) * 0.01)) % 8.8));
+        pos.setZ(i, base[offset + 2] + Math.sin(time * 0.35 + i * 0.7) * 0.2);
       }
       pos.needsUpdate = true;
     }
@@ -1124,7 +1122,7 @@ export class SolanderGardenWorld {
     // Animate glowing eggs gentle bobbing & wobble
     this.eggs.forEach((egg, idx) => {
       if (!egg.hatched) {
-        egg.mesh.position.y += Math.sin(time * 3 + idx) * 0.0015;
+        egg.mesh.position.y = egg.mesh.userData.baseY + Math.sin(time * 3 + idx) * 0.08;
         egg.mesh.rotation.z = Math.sin(time * 2 + idx) * 0.08;
       }
     });
@@ -1132,10 +1130,12 @@ export class SolanderGardenWorld {
     // Fireflies slow float - using constants
     if (this.fireflies) {
       const pos = this.fireflies.geometry.attributes.position as THREE.BufferAttribute;
+      const base = this.fireflies.geometry.userData.basePositions as Float32Array;
       for (let i = 0; i < pos.count; i++) {
-        let y = pos.getY(i) + Math.sin(time + i) * 0.003;
-        if (y > GARDEN_EXTENDED.FIREFLY_Y_MAX) y = GARDEN_EXTENDED.FIREFLY_Y_MIN;
-        pos.setY(i, y);
+        const offset = i * 3;
+        const span = GARDEN_EXTENDED.FIREFLY_Y_MAX - GARDEN_EXTENDED.FIREFLY_Y_MIN;
+        const baseY = base[offset + 1];
+        pos.setY(i, Math.max(GARDEN_EXTENDED.FIREFLY_Y_MIN, Math.min(GARDEN_EXTENDED.FIREFLY_Y_MAX, baseY + Math.sin(time + i) * Math.min(0.18, span * 0.08))));
       }
       pos.needsUpdate = true;
     }
