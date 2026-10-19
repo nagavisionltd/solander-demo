@@ -248,7 +248,13 @@ export class HubWorld {
 
       // Use the supplied entrance assets at the real lobby destinations. The
       // invisible PortalCave objects remain as interaction trigger volumes only.
-      if (this.gardenPortal) this.gardenPortal.mesh.visible = false;
+      if (this.gardenPortal) {
+        // The supplied Neutral Garden entrance now handles garden travel.
+        // Keep the legacy portal trigger away from the new entrance trigger.
+        this.gardenPortal.position.set(-1000, 0, -1000);
+        this.gardenPortal.mesh.position.set(-1000, 0, -1000);
+        this.gardenPortal.mesh.visible = false;
+      }
       if (this.adventurePortal) {
         this.adventurePortal.position.set(21, 0, 0);
         this.adventurePortal.mesh.position.set(21, 0, 0);
