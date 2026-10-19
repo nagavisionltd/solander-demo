@@ -738,7 +738,9 @@ export class GameSceneManager {
       this.portalToHub,
       this.companionCreature,
       this.creatures,
-      this.currentWorld
+      this.currentWorld,
+      this.hubWorld.gardenPortal,
+      this.hubWorld.adventurePortal
     );
 
     this.onPromptChange(prompt);
