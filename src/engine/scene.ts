@@ -54,7 +54,7 @@ export class GameSceneManager {
   public interactionManager: InteractionManager;
 
   private clock: THREE.Clock;
-  private currentWorld: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD' = 'GARDEN';
+  private currentWorld: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD' = 'HUB_WORLD';
   public isFading: boolean = false;
   public fadeOpacity: number = 0;
   private onPromptChange: (prompt: ActivePrompt | null) => void;
@@ -138,8 +138,9 @@ export class GameSceneManager {
     this.gardenWorld = new SolanderGardenWorld();
     this.mysticValleyWorld = new MysticValleyWorld();
     this.hubWorld = new HubWorld();
+    this.gardenWorld.group.visible = false;
     this.mysticValleyWorld.group.visible = false;
-    this.hubWorld.sceneGroup.visible = false;
+    this.hubWorld.sceneGroup.visible = true;
 
     this.scene.add(this.gardenWorld.group);
     this.scene.add(this.mysticValleyWorld.group);
@@ -163,6 +164,15 @@ export class GameSceneManager {
 
     // Creatures
     this.initCreatures();
+
+    // Start directly in the asset-based lobby; preserve Lumi as the active companion.
+    this.player.position.set(0, 0.43, 0);
+    this.player.mesh.position.copy(this.player.position);
+    if (this.companionCreature) {
+      this.gardenWorld.group.remove(this.companionCreature.mesh);
+      this.hubWorld.sceneGroup.add(this.companionCreature.mesh);
+      this.companionCreature.position.set(1.5, 0, 0);
+    }
 
     // Interaction Manager
     this.interactionManager = new InteractionManager();
