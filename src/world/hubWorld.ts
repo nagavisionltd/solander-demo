@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { PortalCave } from './portals';
 
 export class HubWorld {
@@ -11,6 +12,8 @@ export class HubWorld {
   // Collision and interactables
   public shopItems: THREE.Mesh[] = [];
   public lessonDesks: THREE.Group[] = [];
+  private readonly proceduralChildren: THREE.Object3D[] = [];
+  private readonly assetLoader = new GLTFLoader();
 
   constructor() {
     this.sceneGroup = new THREE.Group();
@@ -190,6 +193,10 @@ export class HubWorld {
 
     this.sceneGroup.add(dojoGroup);
 
+    // Snapshot only the original procedural hub scenery. Async asset loading must
+    // never hide a companion mesh that is added to this group later.
+    this.proceduralChildren.push(...this.sceneGroup.children);
+
     // ==========================================
     // PORTALS TO OTHER WORLDS
     // ==========================================
@@ -231,11 +238,16 @@ export class HubWorld {
       model.position.y -= fitted.min.y;
 
       // Keep portal meshes available to the existing world-transition system.
-      for (const child of [...this.sceneGroup.children]) {
-        if (child !== this.gardenPortal?.mesh && child !== this.adventurePortal?.mesh) {
-          child.visible = false;
-        }
-      }
+      for (const child of this.proceduralChildren) child.visible = false;
+
+      // Use the supplied entrance assets at the real lobby destinations. The
+      // invisible PortalCave objects remain as interaction trigger volumes only.
+      if (this.gardenPortal) this.gardenPortal.mesh.visible = false;
+      if (this.adventurePortal) this.adventurePortal.mesh.visible = false;
+      await this.loadEntranceAsset('chao-garden-entrance/chao_garden_entrance.glb', new THREE.Vector3(-12, 0, 16), 2.8);
+      await this.loadEntranceAsset('hero-garden-entrance/hero_garden_entrance.glb', new THREE.Vector3(0, 0, 16), 2.8);
+      await this.loadEntranceAsset('dark-garden-entrance/dark_garden_entrance.glb', new THREE.Vector3(12, 0, 16), 2.8);
+      await this.loadEntranceAsset('chao-kindergarden-entrance/chao_kindergarden_entrance.glb', new THREE.Vector3(18, 0, -12), 2.2);
       model.traverse((node) => {
         if (node instanceof THREE.Mesh) {
           node.castShadow = true;
@@ -255,6 +267,36 @@ export class HubWorld {
     } catch (error) {
       // Keep the procedural hub as a reliable fallback if an asset or texture fails.
       console.warn('[Solander] Classic lobby asset failed to load; using procedural hub.', error);
+    }
+  }
+
+  private async loadEntranceAsset(relativePath: string, position: THREE.Vector3, targetSize: number): Promise<void> {
+    const url = `https://raw.githubusercontent.com/nagavisionltd/solander-demo/main/sa2b_assets/chao_garden_assets/${relativePath}`;
+    try {
+      const gltf = await this.assetLoader.loadAsync(url);
+      const model = gltf.scene;
+      model.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = bounds.getSize(new THREE.Vector3());
+      const maxDimension = Math.max(size.x, size.y, size.z) || 1;
+      model.scale.setScalar(targetSize / maxDimension);
+      model.updateMatrixWorld(true);
+      const fitted = new THREE.Box3().setFromObject(model);
+      const center = fitted.getCenter(new THREE.Vector3());
+      model.position.set(position.x - center.x, position.y - fitted.min.y, position.z - center.z);
+      model.traverse((node) => {
+        if (node instanceof THREE.Mesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          materials.forEach((material) => { material.side = THREE.DoubleSide; material.needsUpdate = true; });
+        }
+      });
+      model.name = `entrance-${relativePath.split('/')[0]}`;
+      model.userData.assetSource = relativePath;
+      this.sceneGroup.add(model);
+    } catch (error) {
+      console.warn(`[Solander] Entrance asset failed to load: ${relativePath}`, error);
     }
   }
 }
