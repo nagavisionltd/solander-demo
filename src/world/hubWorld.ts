@@ -14,6 +14,10 @@ export class HubWorld {
   public lessonDesks: THREE.Group[] = [];
   private readonly proceduralChildren: THREE.Object3D[] = [];
   private readonly assetLoader = new GLTFLoader();
+  private lobbyModel: THREE.Object3D | null = null;
+  private entranceModels: THREE.Object3D[] = [];
+  private readonly gardenModels: Partial<Record<'NEUTRAL' | 'HERO' | 'DARK', THREE.Object3D>> = {};
+  public activeAssetGarden: 'NEUTRAL' | 'HERO' | 'DARK' | null = null;
 
   constructor() {
     this.sceneGroup = new THREE.Group();
@@ -263,11 +267,70 @@ export class HubWorld {
       });
       model.name = 'classic-chao-lobby-asset';
       model.userData.assetSource = 'sa2b_assets/chao_garden_assets/Chao Lobby';
+      this.lobbyModel = model;
       this.sceneGroup.add(model);
+      await this.loadAssetGardens();
     } catch (error) {
       // Keep the procedural hub as a reliable fallback if an asset or texture fails.
       console.warn('[Solander] Classic lobby asset failed to load; using procedural hub.', error);
     }
+  }
+
+  /** Load the supplied garden environments and keep them hidden until entered. */
+  private async loadAssetGardens(): Promise<void> {
+    const root = 'https://raw.githubusercontent.com/nagavisionltd/solander-demo/main/sa2b_assets/chao_garden_assets/';
+    const loadObj = async (folder: string, file: string, mtlFile: string) => {
+      const base = root + folder;
+      const materials = await new MTLLoader().setPath(base).loadAsync(mtlFile);
+      materials.preload();
+      return new OBJLoader().setMaterials(materials).setPath(base).loadAsync(file);
+    };
+    const loaders: Array<{ id: 'NEUTRAL' | 'HERO' | 'DARK'; load: () => Promise<THREE.Object3D> }> = [
+      { id: 'NEUTRAL', load: async () => (await this.assetLoader.loadAsync(root + 'chao-garden/chao_garden.glb')).scene },
+      { id: 'HERO', load: async () => loadObj('Hero%20Chao%20Garden/', 'HeroGarden.obj', 'HeroGarden.mtl') },
+      { id: 'DARK', load: async () => { const loader = new ColladaLoader(); return (await loader.setPath(root + 'Dark%20Chao%20Garden/').loadAsync('DarkGarden.dae')).scene; } }
+    ];
+    for (const spec of loaders) {
+      try {
+        const model = await spec.load();
+        model.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(model);
+        const size = bounds.getSize(new THREE.Vector3());
+        model.scale.setScalar(42 / Math.max(size.x, size.z, 0.001));
+        model.updateMatrixWorld(true);
+        const fitted = new THREE.Box3().setFromObject(model);
+        const center = fitted.getCenter(new THREE.Vector3());
+        model.position.set(-center.x, -fitted.min.y, -center.z);
+        model.traverse((node) => {
+          if (node instanceof THREE.Mesh) {
+            node.castShadow = true; node.receiveShadow = true;
+            const mats = Array.isArray(node.material) ? node.material : [node.material];
+            mats.forEach((mat) => { mat.side = THREE.DoubleSide; const m = mat as THREE.Material & { map?: THREE.Texture | null }; if (m.map) m.map.colorSpace = THREE.SRGBColorSpace; mat.needsUpdate = true; });
+          }
+        });
+        model.name = 'asset-garden-' + spec.id.toLowerCase();
+        model.visible = false; model.userData.assetGarden = spec.id;
+        this.gardenModels[spec.id] = model; this.sceneGroup.add(model);
+      } catch (error) { console.warn('[Solander] Garden asset failed to load: ' + spec.id, error); }
+    }
+  }
+
+  public enterAssetGarden(id: 'NEUTRAL' | 'HERO' | 'DARK'): boolean {
+    const garden = this.gardenModels[id];
+    if (!garden) return false;
+    this.activeAssetGarden = id;
+    if (this.lobbyModel) this.lobbyModel.visible = false;
+    this.entranceModels.forEach((entrance) => { entrance.visible = false; });
+    Object.values(this.gardenModels).forEach((model) => { if (model) model.visible = false; });
+    garden.visible = true;
+    return true;
+  }
+
+  public exitAssetGarden(): void {
+    this.activeAssetGarden = null;
+    Object.values(this.gardenModels).forEach((model) => { if (model) model.visible = false; });
+    if (this.lobbyModel) this.lobbyModel.visible = true;
+    this.entranceModels.forEach((entrance) => { entrance.visible = true; });
   }
 
   private async loadEntranceAsset(relativePath: string, position: THREE.Vector3, targetSize: number): Promise<void> {
@@ -294,6 +357,7 @@ export class HubWorld {
       });
       model.name = `entrance-${relativePath.split('/')[0]}`;
       model.userData.assetSource = relativePath;
+      this.entranceModels.push(model);
       this.sceneGroup.add(model);
     } catch (error) {
       console.warn(`[Solander] Entrance asset failed to load: ${relativePath}`, error);
