@@ -243,7 +243,8 @@ export class HubWorld {
           const materials = Array.isArray(node.material) ? node.material : [node.material];
           materials.forEach((material) => {
             material.side = THREE.DoubleSide;
-            if ('map' in material && material.map) material.map.colorSpace = THREE.SRGBColorSpace;
+            const mapped = material as THREE.Material & { map?: THREE.Texture | null };
+            if (mapped.map) mapped.map.colorSpace = THREE.SRGBColorSpace;
             material.needsUpdate = true;
           });
         }
