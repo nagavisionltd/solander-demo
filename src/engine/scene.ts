@@ -174,6 +174,9 @@ export class GameSceneManager {
       this.companionCreature.position.set(1.5, 0, 0);
     }
 
+    saveSystem.setWorld('HUB_WORLD');
+    this.onWorldChange?.('HUB_WORLD');
+
     // Interaction Manager
     this.interactionManager = new InteractionManager();
 
