@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { PortalCave } from './portals';
 
 export class HubWorld {
@@ -201,5 +203,57 @@ export class HubWorld {
   public update(time: number, deltaTime: number = 0.016) {
     this.gardenPortal.update(time);
     this.adventurePortal.update(time);
+    this.loadClassicLobbyAsset();
+  }
+
+  /** Load the classic lobby as a replaceable visual layer; keep gameplay systems separate. */
+  private async loadClassicLobbyAsset(): Promise<void> {
+    const base = 'https://raw.githubusercontent.com/nagavisionltd/solander-demo/main/sa2b_assets/chao_garden_assets/Chao%20Lobby/';
+    try {
+      const materials = await new MTLLoader().setPath(base).loadAsync('Chao%20Lobby%20(Version%201).mtl');
+      materials.preload();
+      const model = await new OBJLoader().setMaterials(materials).setPath(base).loadAsync('Chao%20Lobby%20(Version%201).obj');
+
+      // The exported model is approximately 120 x 71 x 114 units. Scale it to fit
+      // the current hub, then ground it by its measured bounds rather than assuming
+      // the source file's origin is at floor level.
+      model.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = bounds.getSize(new THREE.Vector3());
+      const targetWidth = 60;
+      const scale = targetWidth / Math.max(size.x, size.z);
+      model.scale.setScalar(scale);
+      model.updateMatrixWorld(true);
+      const fitted = new THREE.Box3().setFromObject(model);
+      const center = fitted.getCenter(new THREE.Vector3());
+      model.position.x -= center.x;
+      model.position.z -= center.z;
+      model.position.y -= fitted.min.y;
+
+      // Keep portal meshes available to the existing world-transition system.
+      for (const child of [...this.sceneGroup.children]) {
+        if (child !== this.gardenPortal?.mesh && child !== this.adventurePortal?.mesh) {
+          child.visible = false;
+        }
+      }
+      model.traverse((node) => {
+        if (node instanceof THREE.Mesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          materials.forEach((material) => {
+            material.side = THREE.DoubleSide;
+            if ('map' in material && material.map) material.map.colorSpace = THREE.SRGBColorSpace;
+            material.needsUpdate = true;
+          });
+        }
+      });
+      model.name = 'classic-chao-lobby-asset';
+      model.userData.assetSource = 'sa2b_assets/chao_garden_assets/Chao Lobby';
+      this.sceneGroup.add(model);
+    } catch (error) {
+      // Keep the procedural hub as a reliable fallback if an asset or texture fails.
+      console.warn('[Solander] Classic lobby asset failed to load; using procedural hub.', error);
+    }
   }
 }
