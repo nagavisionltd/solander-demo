@@ -1,0 +1,6 @@
+{
+  "name": "Solander Demo",
+  "description": "A 3D playable creature garden and exploration game demo powered by Three.js",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
