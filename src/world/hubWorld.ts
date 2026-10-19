@@ -198,12 +198,12 @@ export class HubWorld {
 
     this.adventurePortal = new PortalCave(new THREE.Vector3(12, 0, 16), 'MYSTIC_VALLEY');
     this.sceneGroup.add(this.adventurePortal.mesh);
+    this.loadClassicLobbyAsset();
   }
 
   public update(time: number, deltaTime: number = 0.016) {
     this.gardenPortal.update(time);
     this.adventurePortal.update(time);
-    this.loadClassicLobbyAsset();
   }
 
   /** Load the classic lobby as a replaceable visual layer; keep gameplay systems separate. */
