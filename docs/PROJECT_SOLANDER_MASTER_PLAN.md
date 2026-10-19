@@ -1,82 +1,69 @@
 # Project Solander — Master Plan
-**Version:** 0.4 · **Date:** 19 October 2026  
+**Version:** 0.5 · **Date:** 19 October 2026  
 **Goal:** Prove the game in-browser, then package the opportunity.  
 **First companion:** Lumi · **First platform:** Browser
 
 ## The game in one sentence
-Raise a Chao in the Garden, explore with it to collect upgrades, evolve it into an adult, then compete in sports and adventure levels.
+Raise and evolve Chao, explore worlds together, take on action stages, and compete using the abilities you develop.
 
-## Three modes
+## Five modes
 
-### 1. Chao Garden — Home
-- Chao follow the player and can be cared for.
-- View Chao level and stats.
-- Plant seeds and grow the garden.
-- Level progress leads to a cocoon, then adult evolution.
+### 1. Chao Garden — Home and care
+Care for Chao, build bonds, plant seeds, grow the garden, and check stats, mood and development. This is the home base.
 
-### 2. Explore — Gather and grow
-- Leave the Garden with your Chao.
-- Explore a compact zone inspired by classic Sonic and Knuckles levels.
-- Find seeds and items that improve Chao stats and level.
-- Return to the Garden to bank discoveries and plant seeds.
+### 2. Adventure — Action stages
+Sonic-style action levels: run, jump, platform, take routes, overcome obstacles and collect stage items. Lumi accompanies the player. This mode is about movement and action.
 
-### 3. Competitions — Play
-Take your Chao into skill-based events:
-- Racing
-- Karate
-- Tennis
-- Swimming
-- Flying
+### 3. Explore — Worlds, battles and loot
+Phantasy Star Online-inspired third-person worlds. Walk around with your Chao, battle enemies, discover areas, find items, gain experience and improve stats. This mode is about discovery and RPG progression.
 
-These are planned modes, not assumed to be implemented. Start with one competition that can be made fun quickly, then expand.
+### 4. Competitions — Chao sports
+Playable events that test developed abilities: start with one solid event, then expand into racing, karate, swimming, flying and other sports.
 
-## Main loop
-**Garden → Explore with Chao → Collect seeds/items → Return → Upgrade Chao / grow Garden → Level up → Cocoon → Adult Chao → Compete → Explore again**
+### 5. Chao Lab — Evolution and collection
+View Chao passports, stages, types, stats and memories; explore collection and customisation; witness cocoon-to-adult evolution. Keep this focused rather than turning it into a large management system.
+
+## Main progression loop
+**Garden → Adventure or Explore → Earn items/experience → Return to Garden → Care, plant and upgrade → Evolve → Competitions → Explore again**
+
+Adventure and Explore are different modes, not two names for the same level.
 
 ## Current repository status
+“Present in source” does not mean verified in a running browser build. Playtest each feature before calling it done.
 
-| Feature | Status |
+| Feature | Known status |
 |---|---|
 | Browser-based 3D scene and Garden | Present in source; runtime needs checking |
-| Chao model and multiple Chao in Garden | Present in source |
-| Player movement and Chao following | Present in source |
-| Chao stats and level progression | Present in source |
-| Rough Sonic-style level / world transition | Present in source; needs playtesting |
-| Resource collection and Garden seed planting | Basic code paths present; needs end-to-end test |
-| Chao cocoon and adult evolution | **Not implemented as a complete feature** |
-| Proper playable sports competitions | **Not yet proven; race/karate logic is currently basic** |
-| Reliable save/load across refresh | Local storage code exists; needs testing |
+| Procedural Chao model, multiple Chao and basic animation | Present in source; visuals are placeholder quality |
+| Player movement and Chao following | Present in source; needs playtesting |
+| Chao stats, emotions and level progression | Present in source; needs end-to-end testing |
+| Sonic-style action level/world transition | Rough level present; needs playtesting |
+| Explore-style combat, loot and world progression | Verify current implementation; build only what is missing |
+| Evolution rules and stat-based types | Evolution system exists in source; verify gameplay wiring and transformation presentation |
+| Playable competitions | Basic race/karate logic exists; verify and make one event genuinely playable |
+| Save/load across refresh | Local storage code exists; needs testing |
 
-“Present in source” does not mean verified in a running browser build. Confirm by playing the current repository.
+## Work one mode at a time
+Do not attempt to polish all five at once. Choose one mode, make it feel and play well, test it, then move to the next. Keep shared systems such as Chao stats, inventory, saves and companion behaviour reusable across modes.
 
-## Demo scope — keep it small
+Recommended order:
+1. **Chao Garden** — establish the visual quality bar and make the home/care loop satisfying.
+2. **Adventure** — make the existing action stage fun and reliable.
+3. **Explore** — build a small world with combat, loot and XP.
+4. **Chao Lab** — connect evolution, collection and visible transformation.
+5. **Competitions** — deliver one complete event, then expand.
 
-The first demo only needs to prove:
+## Chao visual approach
+Keep gameplay logic, stats, AI, interaction and animation control in code. For higher-quality character visuals, use a proper 3D model asset (ideally GLB/glTF) created in Blender or with an AI 3D modelling workflow, then load and animate it in Three.js. Claude can help write Blender scripts, model-loading code and rig/animation integration, but basic procedural spheres and capsules alone will keep looking like prototypes. Preserve a procedural fallback while testing a model asset. Keep the Solander design original.
 
-1. Move around the Garden with Lumi following.
-2. Enter one Explore level.
-3. Collect a seed and one stat-upgrade item.
-4. Return and see the items banked; plant a seed.
-5. Gain Chao levels from upgrades.
-6. Trigger a visible cocoon → adult evolution.
-7. Enter one simple competition.
-
-Do not build every sport, many biomes, multiplayer, accounts or a full franchise system yet.
-
-## Build order
-
-1. **Verify existing build:** run it, check controls, Chao following, stats, resources and level transition.
-2. **Complete Explore loop:** collect → return → bank → plant/upgrade.
-3. **Implement evolution:** define the level threshold, cocoon state, short transformation, adult model/appearance and saved adult state.
-4. **Build one competition:** choose the simplest mode to prototype and make it playable, not timer-only.
-5. **Playtest:** see whether people understand the loop and want to keep raising their Chao.
-6. **Package the opportunity:** short gameplay video, concise pitch deck, feature roadmap and realistic next-phase budget.
+## Demo target
+Prove one coherent playable slice with Lumi: a polished Garden, one Adventure stage, one small Explore zone with combat and loot, visible progression/evolution, and one playable competition. Build this incrementally; do not fake unfinished modes with menu text.
 
 ## Rules
-- Keep the current browser stack; iterate rather than rewrite.
-- Prioritise a fun loop over feature count.
-- Clearly separate working features from planned ones.
-- Use the attached loop and Chao model as the reference for the demo.
-- The game is inspired by classic creature-raising, Sonic-style exploration and Wii Sports-style competition; develop an original Solander identity and assets.
+- Keep the current browser stack; make targeted changes rather than rewriting working systems.
+- Preserve and test existing functionality before replacing it.
+- Separate working features from planned ones.
+- Use the attached game loop and Chao Sanctuary model as references.
+- Draw inspiration from creature-raising, Sonic-style action and PSO-style exploration, but create an original Solander identity and assets.
 
-**Success means:** a player can raise a Chao, explore for upgrades, see it evolve, and try a competition — in one coherent playable demo.
+**Success means:** the player forms a bond with Lumi, explores and earns progression, sees their Chao develop, and has a reason to keep playing.
