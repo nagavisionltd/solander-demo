@@ -249,7 +249,11 @@ export class HubWorld {
       // Use the supplied entrance assets at the real lobby destinations. The
       // invisible PortalCave objects remain as interaction trigger volumes only.
       if (this.gardenPortal) this.gardenPortal.mesh.visible = false;
-      if (this.adventurePortal) this.adventurePortal.mesh.visible = false;
+      if (this.adventurePortal) {
+        this.adventurePortal.position.set(21, 0, 0);
+        this.adventurePortal.mesh.position.set(21, 0, 0);
+        this.adventurePortal.mesh.visible = true;
+      }
       await this.loadEntranceAsset('chao-garden-entrance/chao_garden_entrance.glb', new THREE.Vector3(-12, 0, 16), 2.8);
       await this.loadEntranceAsset('hero-garden-entrance/hero_garden_entrance.glb', new THREE.Vector3(0, 0, 16), 2.8);
       await this.loadEntranceAsset('dark-garden-entrance/dark_garden_entrance.glb', new THREE.Vector3(12, 0, 16), 2.8);
