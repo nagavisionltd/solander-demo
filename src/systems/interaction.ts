@@ -28,7 +28,9 @@ export class InteractionManager {
     portalToHub: PortalCave | null,
     companionCreature: SolanderCreature | null,
     allCreatures: SolanderCreature[],
-    currentWorld: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD'
+    currentWorld: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD',
+    hubGardenPortal?: PortalCave,
+    hubAdventurePortalArg?: PortalCave
   ): ActivePrompt | null {
     const playerPos = player.position;
     this.currentPrompt = null;
@@ -83,9 +85,14 @@ export class InteractionManager {
         }
       }
     } else if (currentWorld === 'HUB_WORLD') {
-      // 1. Check Return Portals in Hub
-      if (portalToGarden) {
-        const dist = portalToGarden.position.distanceTo(playerPos);
+      // Use the portals that physically belong to the hub. The global
+      // Garden/Valley portals are located in other worlds and must not be
+      // used for hub proximity checks.
+      const hubReturnPortal = hubGardenPortal ?? portalToGarden;
+      const hubAdventurePortal = hubAdventurePortalArg ?? portalToValley;
+
+      if (hubReturnPortal) {
+        const dist = hubReturnPortal.position.distanceTo(playerPos);
         if (dist < 3.8) {
           this.currentPrompt = {
             type: 'PORTAL',
@@ -93,22 +100,22 @@ export class InteractionManager {
             subtitle: 'Return to the main peaceful sanctuary garden',
             actionText: 'Return to Garden',
             targetId: 'portal_garden',
-            position: portalToGarden.position
+            position: hubReturnPortal.position
           };
           return this.currentPrompt;
         }
       }
 
-      if (portalToValley) {
-        const dist = portalToValley.position.distanceTo(playerPos);
+      if (hubAdventurePortal) {
+        const dist = hubAdventurePortal.position.distanceTo(playerPos);
         if (dist < 4.2) {
           this.currentPrompt = {
             type: 'PORTAL',
             title: '⚡ ADVENTURE STAGE SELECT ⚡',
-            subtitle: 'Enter Left Mountain Cave to choose Adventure Stage',
+            subtitle: 'Enter the Adventure portal to choose a stage',
             actionText: 'Open Stage Select',
             targetId: 'portal_valley',
-            position: portalToValley.position
+            position: hubAdventurePortal.position
           };
           return this.currentPrompt;
         }
