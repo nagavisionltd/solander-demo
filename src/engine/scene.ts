@@ -492,6 +492,36 @@ export class GameSceneManager {
     // Player Movement Update with SA2 Momentum Engine
     this.player.update(inputVec, inputManager, this.cameraSystem, deltaTime, this.getGroundHeight, this.scene, inWater);
 
+    // Asset-based Chao hub: walking through a supplied entrance swaps to its real garden model.
+    if (this.currentWorld === 'HUB_WORLD') {
+      const activeGarden = this.hubWorld.activeAssetGarden;
+      if (!activeGarden) {
+        const doors: Array<{ id: 'NEUTRAL' | 'HERO' | 'DARK'; x: number }> = [
+          { id: 'NEUTRAL', x: -12 }, { id: 'HERO', x: 0 }, { id: 'DARK', x: 12 }
+        ];
+        for (const door of doors) {
+          const dx = this.player.position.x - door.x;
+          const dz = this.player.position.z - 16;
+          if (Math.hypot(dx, dz) < 3.6 && this.hubWorld.enterAssetGarden(door.id)) {
+            this.player.position.set(0, 0.43, -10);
+            this.player.velocity.set(0, 0, 0);
+            this.player.currentHorizontalSpeed = 0;
+            this.player.mesh.position.copy(this.player.position);
+            break;
+          }
+        }
+      } else {
+        const exit = this.hubWorld.gardenExitModel;
+        if (exit && Math.hypot(this.player.position.x - exit.position.x, this.player.position.z - exit.position.z) < 3.6) {
+          this.hubWorld.exitAssetGarden();
+          this.player.position.set(0, 0.43, 0);
+          this.player.velocity.set(0, 0, 0);
+          this.player.currentHorizontalSpeed = 0;
+          this.player.mesh.position.copy(this.player.position);
+        }
+      }
+    }
+
     // Laser Projectile Hit Detection in Mystic Valley
     if (this.currentWorld === 'MYSTIC_VALLEY') {
       const projectiles = this.player.laserGun.projectiles;
