@@ -54,7 +54,7 @@ export class GameSceneManager {
   public interactionManager: InteractionManager;
 
   private clock: THREE.Clock;
-  private currentWorld: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD' = 'GARDEN';
+  private currentWorld: 'GARDEN' | 'MYSTIC_VALLEY' | 'HUB_WORLD' = 'HUB_WORLD';
   public isFading: boolean = false;
   public fadeOpacity: number = 0;
   private onPromptChange: (prompt: ActivePrompt | null) => void;
@@ -138,8 +138,9 @@ export class GameSceneManager {
     this.gardenWorld = new SolanderGardenWorld();
     this.mysticValleyWorld = new MysticValleyWorld();
     this.hubWorld = new HubWorld();
+    this.gardenWorld.group.visible = false;
     this.mysticValleyWorld.group.visible = false;
-    this.hubWorld.sceneGroup.visible = false;
+    this.hubWorld.sceneGroup.visible = true;
 
     this.scene.add(this.gardenWorld.group);
     this.scene.add(this.mysticValleyWorld.group);
@@ -163,6 +164,18 @@ export class GameSceneManager {
 
     // Creatures
     this.initCreatures();
+
+    // Start directly in the asset-based lobby; preserve Lumi as the active companion.
+    this.player.position.set(0, 0.43, 0);
+    this.player.mesh.position.copy(this.player.position);
+    if (this.companionCreature) {
+      this.gardenWorld.group.remove(this.companionCreature.mesh);
+      this.hubWorld.sceneGroup.add(this.companionCreature.mesh);
+      this.companionCreature.position.set(1.5, 0, 0);
+    }
+
+    saveSystem.setWorld('HUB_WORLD');
+    this.onWorldChange?.('HUB_WORLD');
 
     // Interaction Manager
     this.interactionManager = new InteractionManager();
@@ -492,6 +505,40 @@ export class GameSceneManager {
     // Player Movement Update with SA2 Momentum Engine
     this.player.update(inputVec, inputManager, this.cameraSystem, deltaTime, this.getGroundHeight, this.scene, inWater);
 
+    // Asset-based Chao hub: walking through a supplied entrance swaps to its real garden model.
+    if (this.currentWorld === 'HUB_WORLD') {
+      const activeGarden = this.hubWorld.activeAssetGarden;
+      if (!activeGarden) {
+        const doors: Array<{ id: 'NEUTRAL' | 'HERO' | 'DARK' }> = [
+          { id: 'NEUTRAL' }, { id: 'HERO' }, { id: 'DARK' }
+        ];
+        for (const door of doors) {
+          // Trigger against the actual supplied entrance asset, and only when it loaded.
+          const center = this.hubWorld.getAssetEntranceCenter(door.id);
+          if (!center) continue;
+          const dx = this.player.position.x - center.x;
+          const dz = this.player.position.z - center.z;
+          if (Math.hypot(dx, dz) < 3.6 && this.hubWorld.enterAssetGarden(door.id)) {
+            this.player.position.set(0, 0.43, -10);
+            this.player.velocity.set(0, 0, 0);
+            this.player.currentHorizontalSpeed = 0;
+            this.player.mesh.position.copy(this.player.position);
+            break;
+          }
+        }
+      } else {
+        const exit = this.hubWorld.gardenExitModel;
+        const exitCenter = exit?.userData.entranceCenter as THREE.Vector3 | undefined;
+        if (exit && exitCenter && Math.hypot(this.player.position.x - exitCenter.x, this.player.position.z - exitCenter.z) < 3.6) {
+          this.hubWorld.exitAssetGarden();
+          this.player.position.set(0, 0.43, 0);
+          this.player.velocity.set(0, 0, 0);
+          this.player.currentHorizontalSpeed = 0;
+          this.player.mesh.position.copy(this.player.position);
+        }
+      }
+    }
+
     // Laser Projectile Hit Detection in Mystic Valley
     if (this.currentWorld === 'MYSTIC_VALLEY') {
       const projectiles = this.player.laserGun.projectiles;
@@ -738,7 +785,9 @@ export class GameSceneManager {
       this.portalToHub,
       this.companionCreature,
       this.creatures,
-      this.currentWorld
+      this.currentWorld,
+      this.hubWorld.gardenPortal,
+      this.hubWorld.adventurePortal
     );
 
     this.onPromptChange(prompt);

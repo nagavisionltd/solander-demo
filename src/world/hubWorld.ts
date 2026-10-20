@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { ColladaLoader } from 'three/examples/jsm/loaders/ColladaLoader.js';
 import { PortalCave } from './portals';
 
 export class HubWorld {
@@ -9,6 +13,13 @@ export class HubWorld {
   // Collision and interactables
   public shopItems: THREE.Mesh[] = [];
   public lessonDesks: THREE.Group[] = [];
+  private readonly proceduralChildren: THREE.Object3D[] = [];
+  private readonly assetLoader = new GLTFLoader();
+  private lobbyModel: THREE.Object3D | null = null;
+  private entranceModels: THREE.Object3D[] = [];
+  private readonly gardenModels: Partial<Record<'NEUTRAL' | 'HERO' | 'DARK', THREE.Object3D>> = {};
+  public activeAssetGarden: 'NEUTRAL' | 'HERO' | 'DARK' | null = null;
+  public gardenExitModel: THREE.Object3D | null = null;
 
   constructor() {
     this.sceneGroup = new THREE.Group();
@@ -188,6 +199,10 @@ export class HubWorld {
 
     this.sceneGroup.add(dojoGroup);
 
+    // Snapshot only the original procedural hub scenery. Async asset loading must
+    // never hide a companion mesh that is added to this group later.
+    this.proceduralChildren.push(...this.sceneGroup.children);
+
     // ==========================================
     // PORTALS TO OTHER WORLDS
     // ==========================================
@@ -196,10 +211,200 @@ export class HubWorld {
 
     this.adventurePortal = new PortalCave(new THREE.Vector3(12, 0, 16), 'MYSTIC_VALLEY');
     this.sceneGroup.add(this.adventurePortal.mesh);
+    this.loadClassicLobbyAsset();
   }
 
   public update(time: number, deltaTime: number = 0.016) {
     this.gardenPortal.update(time);
     this.adventurePortal.update(time);
+  }
+
+  /** Load the classic lobby as a replaceable visual layer; keep gameplay systems separate. */
+  private async loadClassicLobbyAsset(): Promise<void> {
+    const base = 'https://raw.githubusercontent.com/nagavisionltd/solander-demo/main/sa2b_assets/chao_garden_assets/Chao%20Lobby/';
+    try {
+      const materials = await new MTLLoader().setPath(base).loadAsync('Chao%20Lobby%20(Version%201).mtl');
+      materials.preload();
+      const model = await new OBJLoader().setMaterials(materials).setPath(base).loadAsync('Chao%20Lobby%20(Version%201).obj');
+
+      // The exported model is approximately 120 x 71 x 114 units. Scale it to fit
+      // the current hub, then ground it by its measured bounds rather than assuming
+      // the source file's origin is at floor level.
+      model.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = bounds.getSize(new THREE.Vector3());
+      const targetWidth = 60;
+      const scale = targetWidth / Math.max(size.x, size.z);
+      model.scale.setScalar(scale);
+      model.updateMatrixWorld(true);
+      const fitted = new THREE.Box3().setFromObject(model);
+      const center = fitted.getCenter(new THREE.Vector3());
+      model.position.x -= center.x;
+      model.position.z -= center.z;
+      model.position.y -= fitted.min.y;
+
+      // Keep portal meshes available to the existing world-transition system.
+      for (const child of this.proceduralChildren) child.visible = false;
+
+      // Use the supplied entrance assets at the real lobby destinations. The
+      // invisible PortalCave objects remain as interaction trigger volumes only.
+      if (this.gardenPortal) {
+        // The supplied Neutral Garden entrance now handles garden travel.
+        // Keep the legacy portal trigger away from the new entrance trigger.
+        this.gardenPortal.position.set(-1000, 0, -1000);
+        this.gardenPortal.mesh.position.set(-1000, 0, -1000);
+        this.gardenPortal.mesh.visible = false;
+      }
+      if (this.adventurePortal) {
+        this.adventurePortal.position.set(21, 0, 0);
+        this.adventurePortal.mesh.position.set(21, 0, 0);
+        this.adventurePortal.mesh.visible = true;
+      }
+      await this.loadEntranceAsset('chao-garden-entrance/chao_garden_entrance.glb', new THREE.Vector3(-12, 0, 16), 2.8);
+      await this.loadEntranceAsset('hero-garden-entrance/hero_garden_entrance.glb', new THREE.Vector3(0, 0, 16), 2.8);
+      await this.loadEntranceAsset('dark-garden-entrance/dark_garden_entrance.glb', new THREE.Vector3(12, 0, 16), 2.8);
+      await this.loadEntranceAsset('chao-kindergarden-entrance/chao_kindergarden_entrance.glb', new THREE.Vector3(18, 0, -12), 2.2);
+      model.traverse((node) => {
+        if (node instanceof THREE.Mesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          materials.forEach((material) => {
+            material.side = THREE.DoubleSide;
+            const mapped = material as THREE.Material & { map?: THREE.Texture | null };
+            if (mapped.map) mapped.map.colorSpace = THREE.SRGBColorSpace;
+            material.needsUpdate = true;
+          });
+        }
+      });
+      model.name = 'classic-chao-lobby-asset';
+      model.userData.assetSource = 'sa2b_assets/chao_garden_assets/Chao Lobby';
+      this.lobbyModel = model;
+      this.sceneGroup.add(model);
+      await this.loadAssetGardens();
+    } catch (error) {
+      // Keep the procedural hub as a reliable fallback if an asset or texture fails.
+      console.warn('[Solander] Classic lobby asset failed to load; using procedural hub.', error);
+    }
+  }
+
+  /** Load the supplied garden environments and keep them hidden until entered. */
+  private async loadAssetGardens(): Promise<void> {
+    const root = 'https://raw.githubusercontent.com/nagavisionltd/solander-demo/main/sa2b_assets/chao_garden_assets/';
+    const loadObj = async (folder: string, file: string, mtlFile: string) => {
+      const base = root + folder;
+      const materials = await new MTLLoader().setPath(base).loadAsync(mtlFile);
+      materials.preload();
+      return new OBJLoader().setMaterials(materials).setPath(base).loadAsync(file);
+    };
+    const loaders: Array<{ id: 'NEUTRAL' | 'HERO' | 'DARK'; load: () => Promise<THREE.Object3D> }> = [
+      { id: 'NEUTRAL', load: async () => (await this.assetLoader.loadAsync(root + 'chao-garden/chao_garden.glb')).scene },
+      { id: 'HERO', load: async () => loadObj('Hero%20Chao%20Garden/', 'HeroGarden.obj', 'HeroGarden.mtl') },
+      { id: 'DARK', load: async () => { const loader = new ColladaLoader(); return (await loader.setPath(root + 'Dark%20Chao%20Garden/').loadAsync('DarkGarden.dae')).scene; } }
+    ];
+    for (const spec of loaders) {
+      try {
+        const model = await spec.load();
+        model.updateMatrixWorld(true);
+        const bounds = new THREE.Box3().setFromObject(model);
+        const size = bounds.getSize(new THREE.Vector3());
+        model.scale.setScalar(42 / Math.max(size.x, size.z, 0.001));
+        model.updateMatrixWorld(true);
+        const fitted = new THREE.Box3().setFromObject(model);
+        const center = fitted.getCenter(new THREE.Vector3());
+        model.position.set(-center.x, -fitted.min.y, -center.z);
+        model.traverse((node) => {
+          if (node instanceof THREE.Mesh) {
+            node.castShadow = true; node.receiveShadow = true;
+            const mats = Array.isArray(node.material) ? node.material : [node.material];
+            mats.forEach((mat) => { mat.side = THREE.DoubleSide; const m = mat as THREE.Material & { map?: THREE.Texture | null }; if (m.map) m.map.colorSpace = THREE.SRGBColorSpace; mat.needsUpdate = true; });
+          }
+        });
+        model.name = 'asset-garden-' + spec.id.toLowerCase();
+        model.visible = false; model.userData.assetGarden = spec.id;
+        this.gardenModels[spec.id] = model; this.sceneGroup.add(model);
+      } catch (error) { console.warn('[Solander] Garden asset failed to load: ' + spec.id, error); }
+    }
+  }
+
+  public getAssetEntranceCenter(id: 'NEUTRAL' | 'HERO' | 'DARK'): THREE.Vector3 | null {
+    const entranceFolder = id === 'NEUTRAL' ? 'chao-garden-entrance/' : (id === 'HERO' ? 'hero-garden-entrance/' : 'dark-garden-entrance/');
+    const sourceEntrance = this.entranceModels.find((entrance) =>
+      String(entrance.userData.assetSource ?? '').startsWith(entranceFolder)
+    );
+    const center = sourceEntrance?.userData.entranceCenter as THREE.Vector3 | undefined;
+    return center ? center.clone() : null;
+  }
+
+  public enterAssetGarden(id: 'NEUTRAL' | 'HERO' | 'DARK'): boolean {
+    const garden = this.gardenModels[id];
+    if (!garden) return false;
+    // Require its own supplied entrance so a missing asset can never strand the player.
+    const entranceFolder = id === 'NEUTRAL' ? 'chao-garden-entrance/' : (id === 'HERO' ? 'hero-garden-entrance/' : 'dark-garden-entrance/');
+    const sourceEntrance = this.entranceModels.find((entrance) =>
+      String(entrance.userData.assetSource ?? '').startsWith(entranceFolder)
+    );
+    if (!sourceEntrance) return false;
+
+    this.activeAssetGarden = id;
+    if (this.lobbyModel) this.lobbyModel.visible = false;
+    this.entranceModels.forEach((entrance) => { entrance.visible = false; });
+    Object.values(this.gardenModels).forEach((model) => { if (model) model.visible = false; });
+    garden.visible = true;
+
+    this.gardenExitModel = sourceEntrance.clone(true);
+    const sourceCenter = sourceEntrance.userData.entranceCenter as THREE.Vector3 | undefined;
+    const exitCenter = new THREE.Vector3(0, 0, -17);
+    if (sourceCenter) {
+      this.gardenExitModel.position.add(exitCenter.clone().sub(sourceCenter));
+    } else {
+      this.gardenExitModel.position.set(0, 0, -17);
+    }
+    this.gardenExitModel.userData.entranceCenter = exitCenter;
+    this.gardenExitModel.visible = true;
+    this.gardenExitModel.name = 'garden-return-entrance';
+    this.sceneGroup.add(this.gardenExitModel);
+    return true;
+  }
+
+  public exitAssetGarden(): void {
+    this.activeAssetGarden = null;
+    if (this.gardenExitModel) { this.sceneGroup.remove(this.gardenExitModel); this.gardenExitModel = null; }
+    Object.values(this.gardenModels).forEach((model) => { if (model) model.visible = false; });
+    if (this.lobbyModel) this.lobbyModel.visible = true;
+    this.entranceModels.forEach((entrance) => { entrance.visible = true; });
+  }
+
+  private async loadEntranceAsset(relativePath: string, position: THREE.Vector3, targetSize: number): Promise<void> {
+    const url = `https://raw.githubusercontent.com/nagavisionltd/solander-demo/main/sa2b_assets/chao_garden_assets/${relativePath}`;
+    try {
+      const gltf = await this.assetLoader.loadAsync(url);
+      const model = gltf.scene;
+      model.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = bounds.getSize(new THREE.Vector3());
+      const maxDimension = Math.max(size.x, size.y, size.z) || 1;
+      model.scale.setScalar(targetSize / maxDimension);
+      model.updateMatrixWorld(true);
+      const fitted = new THREE.Box3().setFromObject(model);
+      const center = fitted.getCenter(new THREE.Vector3());
+      model.position.set(position.x - center.x, position.y - fitted.min.y, position.z - center.z);
+      model.traverse((node) => {
+        if (node instanceof THREE.Mesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+          const materials = Array.isArray(node.material) ? node.material : [node.material];
+          materials.forEach((material) => { material.side = THREE.DoubleSide; material.needsUpdate = true; });
+        }
+      });
+      model.name = `entrance-${relativePath.split('/')[0]}`;
+      model.userData.assetSource = relativePath;
+      // Keep the intended doorway center separately from the model-origin offset.
+      model.userData.entranceCenter = position.clone();
+      this.entranceModels.push(model);
+      this.sceneGroup.add(model);
+    } catch (error) {
+      console.warn(`[Solander] Entrance asset failed to load: ${relativePath}`, error);
+    }
   }
 }
