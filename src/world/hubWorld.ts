@@ -335,11 +335,23 @@ export class HubWorld {
     this.entranceModels.forEach((entrance) => { entrance.visible = false; });
     Object.values(this.gardenModels).forEach((model) => { if (model) model.visible = false; });
     garden.visible = true;
-    const entranceIndex = id === 'NEUTRAL' ? 0 : (id === 'HERO' ? 1 : 2);
-    const sourceEntrance = this.entranceModels[entranceIndex];
+    // Find entrances by asset identity, not array index: a failed download must
+    // never cause a different garden's entrance to become the return doorway.
+    const entranceFolder = id === 'NEUTRAL' ? 'chao-garden-entrance/' : (id === 'HERO' ? 'hero-garden-entrance/' : 'dark-garden-entrance/');
+    const sourceEntrance = this.entranceModels.find((entrance) =>
+      String(entrance.userData.assetSource ?? '').startsWith(entranceFolder)
+    );
     if (sourceEntrance) {
       this.gardenExitModel = sourceEntrance.clone(true);
-      this.gardenExitModel.position.set(0, 0, -17);
+      const sourceCenter = sourceEntrance.userData.entranceCenter as THREE.Vector3 | undefined;
+      const exitCenter = new THREE.Vector3(0, 0, -17);
+      if (sourceCenter) {
+        // Preserve the model's bounds-centering offset when relocating it.
+        this.gardenExitModel.position.add(exitCenter.clone().sub(sourceCenter));
+      } else {
+        this.gardenExitModel.position.set(0, 0, -17);
+      }
+      this.gardenExitModel.userData.entranceCenter = exitCenter;
       this.gardenExitModel.visible = true;
       this.gardenExitModel.name = 'garden-return-entrance';
       this.sceneGroup.add(this.gardenExitModel);
@@ -379,6 +391,8 @@ export class HubWorld {
       });
       model.name = `entrance-${relativePath.split('/')[0]}`;
       model.userData.assetSource = relativePath;
+      // Keep the intended doorway center separately from the model-origin offset.
+      model.userData.entranceCenter = position.clone();
       this.entranceModels.push(model);
       this.sceneGroup.add(model);
     } catch (error) {
