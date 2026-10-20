@@ -525,7 +525,8 @@ export class GameSceneManager {
         }
       } else {
         const exit = this.hubWorld.gardenExitModel;
-        if (exit && Math.hypot(this.player.position.x - exit.position.x, this.player.position.z - exit.position.z) < 3.6) {
+        const exitCenter = exit?.userData.entranceCenter as THREE.Vector3 | undefined;
+        if (exit && exitCenter && Math.hypot(this.player.position.x - exitCenter.x, this.player.position.z - exitCenter.z) < 3.6) {
           this.hubWorld.exitAssetGarden();
           this.player.position.set(0, 0.43, 0);
           this.player.velocity.set(0, 0, 0);
