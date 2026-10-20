@@ -509,12 +509,15 @@ export class GameSceneManager {
     if (this.currentWorld === 'HUB_WORLD') {
       const activeGarden = this.hubWorld.activeAssetGarden;
       if (!activeGarden) {
-        const doors: Array<{ id: 'NEUTRAL' | 'HERO' | 'DARK'; x: number }> = [
-          { id: 'NEUTRAL', x: -12 }, { id: 'HERO', x: 0 }, { id: 'DARK', x: 12 }
+        const doors: Array<{ id: 'NEUTRAL' | 'HERO' | 'DARK' }> = [
+          { id: 'NEUTRAL' }, { id: 'HERO' }, { id: 'DARK' }
         ];
         for (const door of doors) {
-          const dx = this.player.position.x - door.x;
-          const dz = this.player.position.z - 16;
+          // Trigger against the actual supplied entrance asset, and only when it loaded.
+          const center = this.hubWorld.getAssetEntranceCenter(door.id);
+          if (!center) continue;
+          const dx = this.player.position.x - center.x;
+          const dz = this.player.position.z - center.z;
           if (Math.hypot(dx, dz) < 3.6 && this.hubWorld.enterAssetGarden(door.id)) {
             this.player.position.set(0, 0.43, -10);
             this.player.velocity.set(0, 0, 0);
